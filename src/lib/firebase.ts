@@ -106,6 +106,7 @@ export function subscribeToUserEntries(
           messageCount: data.messageCount || 0,
           summary: data.summary || null,
           pinned: Boolean(data.pinned),
+          location: data.location || null,
         });
       });
       onUpdate(entries);

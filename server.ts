@@ -90,7 +90,7 @@ app.get("/api/health", (_req, res) => {
 app.post("/api/chat", async (req, res) => {
   try {
     const body = req.body && typeof req.body === "object" ? req.body : {};
-    const { messages, mode, systemInstruction: customInstruction } = body;
+    const { messages, mode, systemInstruction: customInstruction, location } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "Missing or invalid 'messages' array payload." });
@@ -119,7 +119,14 @@ app.post("/api/chat", async (req, res) => {
       modeInstruction += " Mode: Clarity & Action. Distill thoughts into crisp summaries, objective truths, clear priorities, actionable next steps, and decision matrices.";
     }
 
-    const finalSystemInstruction = customInstruction ? `${modeInstruction}\n\nUser Context: ${customInstruction}` : modeInstruction;
+    // Location Grounding context
+    let locationContext = "";
+    if (location && typeof location === "object" && location.placeName) {
+      const placeName = String(location.placeName).slice(0, 100);
+      locationContext = `\n\nGeographic Context: The user is reflecting from "${placeName}". Ground your reflections with atmospheric, contemplative, or environmental awareness when appropriate without revealing private coordinates.`;
+    }
+
+    const finalSystemInstruction = `${modeInstruction}${locationContext}${customInstruction ? `\n\nUser Context: ${customInstruction}` : ""}`;
 
     const result = await generateContentWithFallback({
       contents: formattedContents,

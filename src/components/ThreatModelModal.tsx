@@ -38,9 +38,9 @@ const THREAT_MODEL_DATA: ThreatModelItem[] = [
   },
   {
     threatZone: "Inter-System Communication",
-    riskDescription: "Gemini API key exposure in client bundles or network transit interception.",
+    riskDescription: "Gemini API key exposure in client bundles, Google Maps API key scraping, or network transit interception.",
     owaspCategory: "OWASP A02 Cryptographic Failures",
-    implementedCountermeasure: "GEMINI_API_KEY resides strictly server-side (no VITE_ exposure). Client communicates exclusively via secure backend proxy endpoints.",
+    implementedCountermeasure: "GEMINI_API_KEY resides strictly server-side (no client exposure). VITE_GOOGLE_MAPS_API_KEY supports HTTP Referrer Restrictions (*.run.app, localhost:3000) and strict API scoping (Maps JS/Places). Client communicates via secure backend proxy endpoints.",
     status: "Enforced",
   },
 ];

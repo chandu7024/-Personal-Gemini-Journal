@@ -22,6 +22,7 @@ export async function sendChatMessage(params: {
   messages: Array<{ role: string; content: string }>;
   mode: ReflectionMode;
   systemInstruction?: string;
+  location?: { lat: number; lng: number; placeName: string } | null;
 }): Promise<ChatResponse> {
   const sanitizedMessages = params.messages.map((m) => ({
     role: m.role,
@@ -37,6 +38,7 @@ export async function sendChatMessage(params: {
       messages: sanitizedMessages,
       mode: params.mode,
       systemInstruction: params.systemInstruction,
+      location: params.location,
     }),
   });
 

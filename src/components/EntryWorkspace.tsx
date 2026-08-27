@@ -12,14 +12,17 @@ import {
   Edit2,
   Check,
   Tag,
+  MapPin,
   Smile,
   AlertCircle,
   RotateCcw,
   Copy,
   Brain,
   MessageSquare,
+  X,
 } from "lucide-react";
-import type { JournalEntry, JournalMessage, ReflectionMode } from "../types";
+import type { JournalEntry, JournalMessage, ReflectionMode, EntryLocation } from "../types";
+import { LocationPickerModal } from "./LocationPickerModal";
 
 interface EntryWorkspaceProps {
   entry: JournalEntry;
@@ -30,6 +33,7 @@ interface EntryWorkspaceProps {
   onChangeMode: (mode: ReflectionMode) => void;
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
+  onUpdateLocation?: (location: EntryLocation | null) => void;
   isInsightsOpen: boolean;
   onToggleInsights: () => void;
 }
@@ -79,6 +83,7 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
   onChangeMode,
   onAddTag,
   onRemoveTag,
+  onUpdateLocation,
   isInsightsOpen,
   onToggleInsights,
 }) => {
@@ -87,6 +92,7 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
   const [tempTitle, setTempTitle] = useState(entry.title);
   const [newTagInput, setNewTagInput] = useState("");
   const [isAddingTag, setIsAddingTag] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
 
@@ -142,8 +148,13 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
   };
 
   const handleAddTagSubmit = () => {
-    if (newTagInput.trim()) {
-      onAddTag(newTagInput.trim().replace(/^#/, ""));
+    const sanitized = newTagInput
+      .replace(/^#+/, "")
+      .replace(/[\r\n]+/g, " ")
+      .trim()
+      .slice(0, 30);
+    if (sanitized) {
+      onAddTag(sanitized);
       setNewTagInput("");
       setIsAddingTag(false);
     }
@@ -159,9 +170,9 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
   const quickPrompts = QUICK_PROMPTS[entry.mode] || QUICK_PROMPTS.mindful;
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-4rem)] bg-slate-50/50 dark:bg-slate-950/40 relative overflow-hidden">
+    <div className="flex-1 flex flex-col h-[calc(100vh-4rem)] bg-slate-100/50 dark:bg-[#0b0f17]/90 relative overflow-hidden">
       {/* Workspace Top Bar */}
-      <div className="p-4 sm:px-6 border-b border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs flex flex-col gap-3">
+      <div className="p-4 sm:px-6 border-b border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-md flex flex-col gap-3 shadow-2xs">
         {/* Title and Controls */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -174,12 +185,12 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
                   onChange={(e) => setTempTitle(e.target.value)}
                   onKeyDown={handleKeyDownTitle}
                   autoFocus
-                  className="w-full text-base sm:text-lg font-bold bg-slate-50 dark:bg-slate-800 border border-indigo-500 rounded-lg px-2.5 py-1 text-slate-900 dark:text-slate-100 focus:outline-hidden"
+                  className="w-full text-base sm:text-lg font-bold bg-white dark:bg-slate-800 border border-indigo-500 rounded-lg px-2.5 py-1 text-slate-900 dark:text-slate-100 focus:outline-hidden shadow-2xs"
                 />
                 <button
                   id="btn-save-title"
                   onClick={handleSaveTitle}
-                  className="p-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shrink-0"
+                  className="p-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shrink-0 cursor-pointer shadow-xs"
                   title="Save title"
                 >
                   <Check className="w-4 h-4" />
@@ -198,7 +209,7 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
                 <button
                   id="btn-edit-title"
                   onClick={() => setIsEditingTitle(true)}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-opacity cursor-pointer"
                   title="Edit title"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
@@ -211,9 +222,9 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
             <button
               id="btn-toggle-insights-panel"
               onClick={onToggleInsights}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-2xs ${
                 isInsightsOpen
-                  ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300"
+                  ? "bg-indigo-50 dark:bg-indigo-950/70 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300"
                   : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
               }`}
             >
@@ -232,16 +243,16 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
           {/* Mode Selector */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-            <span className="text-[11px] font-medium text-slate-400 shrink-0">Mode:</span>
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider shrink-0 mr-0.5">Mode:</span>
             {REFLECTION_MODES.map((mode) => (
               <button
                 key={mode.id}
                 id={`btn-mode-${mode.id}`}
                 onClick={() => onChangeMode(mode.id)}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer border ${
                   entry.mode === mode.id
-                    ? "bg-indigo-600 text-white shadow-xs"
-                    : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-xs ring-1 ring-indigo-600/30"
+                    : "bg-white dark:bg-slate-800/90 text-slate-600 dark:text-slate-400 border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-50 dark:hover:bg-slate-700"
                 }`}
                 title={mode.desc}
               >
@@ -251,28 +262,33 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
             ))}
           </div>
 
-          {/* Tags */}
-          <div className="flex items-center gap-1.5 text-xs">
+          {/* Tags & Location */}
+          <div className="flex items-center flex-wrap gap-1.5 text-xs shrink-0 py-0.5">
             {entry.tags?.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px]"
+                title={`#${tag}`}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200/80 dark:border-indigo-800/70 text-indigo-700 dark:text-indigo-300 text-[11px] font-medium transition-all max-w-[200px] shadow-2xs"
               >
-                <span>#{tag}</span>
+                <span className="truncate max-w-[160px]">#{tag}</span>
                 <button
+                  id={`btn-remove-tag-${tag.slice(0, 12)}`}
                   onClick={() => onRemoveTag(tag)}
-                  className="text-slate-400 hover:text-rose-500 font-bold"
+                  className="shrink-0 p-0.5 rounded-xs text-indigo-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
+                  title={`Remove tag: ${tag}`}
                 >
-                  &times;
+                  <X className="w-3 h-3" />
                 </button>
               </span>
             ))}
 
             {isAddingTag ? (
-              <div className="inline-flex items-center gap-1">
+              <div className="inline-flex items-center gap-1 bg-white dark:bg-slate-900 border border-indigo-500 rounded-md px-2 py-0.5 shadow-xs">
+                <Tag className="w-3 h-3 text-indigo-500" />
                 <input
+                  id="input-new-tag"
                   type="text"
-                  placeholder="tag"
+                  placeholder="e.g. Work"
                   value={newTagInput}
                   onChange={(e) => setNewTagInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -280,27 +296,75 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
                     if (e.key === "Escape") setIsAddingTag(false);
                   }}
                   autoFocus
-                  className="w-20 px-1.5 py-0.5 text-[11px] bg-slate-50 dark:bg-slate-800 border border-indigo-400 rounded-md focus:outline-hidden"
+                  className="w-24 text-[11px] bg-transparent text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden"
                 />
                 <button
+                  id="btn-confirm-add-tag"
                   onClick={handleAddTagSubmit}
-                  className="text-indigo-600 dark:text-indigo-400 font-bold text-xs"
+                  className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 cursor-pointer"
+                  title="Save Tag (Enter)"
                 >
-                  +
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  id="btn-cancel-add-tag"
+                  onClick={() => {
+                    setNewTagInput("");
+                    setIsAddingTag(false);
+                  }}
+                  className="p-0.5 rounded text-slate-400 hover:text-rose-500 cursor-pointer"
+                  title="Cancel (Esc)"
+                >
+                  &times;
                 </button>
               </div>
             ) : (
               <button
+                id="btn-open-add-tag"
                 onClick={() => setIsAddingTag(true)}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border border-dashed border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-400 dark:hover:border-indigo-600 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 transition-all cursor-pointer shadow-2xs"
+                title="Add a tag to categorize this reflection"
               >
-                <Tag className="w-3 h-3" />
+                <Tag className="w-3 h-3 text-indigo-500" />
                 <span>+ Tag</span>
+              </button>
+            )}
+
+            {/* Location Pin Button */}
+            {entry.location ? (
+              <button
+                id="btn-edit-location"
+                onClick={() => setIsLocationModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-all cursor-pointer shadow-2xs"
+                title={`Pinned to: ${entry.location.placeName}. Click to change.`}
+              >
+                <MapPin className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="truncate max-w-[120px]">{entry.location.placeName}</span>
+              </button>
+            ) : (
+              <button
+                id="btn-add-location"
+                onClick={() => setIsLocationModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border border-dashed border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-400 dark:hover:border-emerald-600 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer shadow-2xs"
+                title="Pin your sanctuary or current reflection location with Google Maps"
+              >
+                <MapPin className="w-3 h-3 text-emerald-500" />
+                <span>+ Location</span>
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* Location Picker Modal */}
+      <LocationPickerModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        location={entry.location}
+        onSaveLocation={(loc) => {
+          if (onUpdateLocation) onUpdateLocation(loc);
+        }}
+      />
 
       {/* Messages Stream */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
@@ -359,49 +423,49 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
 
                 {/* Message Bubble */}
                 <div
-                  className={`group relative p-4 rounded-2xl text-xs sm:text-sm leading-relaxed transition-all ${
+                  className={`group relative p-4 sm:p-5 rounded-2xl text-xs sm:text-sm leading-relaxed transition-all shadow-xs ${
                     isUser
-                      ? "bg-slate-900 text-white dark:bg-indigo-600 dark:text-white rounded-tr-xs"
-                      : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-slate-800 rounded-tl-xs shadow-xs"
+                      ? "bg-slate-900 text-white dark:bg-indigo-650 dark:text-white rounded-tr-xs shadow-sm ring-1 ring-slate-800 dark:ring-indigo-500/30"
+                      : "bg-white dark:bg-[#0f172a] text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-slate-800/90 rounded-tl-xs"
                   }`}
                 >
                   {isUser ? (
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    <div className="whitespace-pre-wrap font-normal leading-relaxed">{msg.content}</div>
                   ) : (
-                    <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-headings:font-semibold prose-ul:my-2 prose-li:my-0.5">
+                    <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-headings:font-bold prose-ul:my-2 prose-li:my-0.5 text-slate-800 dark:text-slate-100">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                     </div>
                   )}
 
                   {/* Message Meta & Copy Button */}
                   <div
-                    className={`flex items-center gap-2 mt-2 pt-1 border-t text-[10px] ${
+                    className={`flex items-center gap-2 mt-3 pt-1.5 border-t text-[10px] ${
                       isUser
                         ? "border-slate-800 dark:border-indigo-500/40 text-slate-400 dark:text-indigo-200"
-                        : "border-slate-100 dark:border-slate-800 text-slate-400"
+                        : "border-slate-100 dark:border-slate-800/80 text-slate-400"
                     }`}
                   >
-                    <span>
+                    <span className="font-medium">
                       {new Date(msg.timestamp).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
                     </span>
                     {!isUser && msg.modelUsed && (
-                      <span className="px-1.5 py-0.2 rounded-sm bg-slate-100 dark:bg-slate-800 text-[9px] font-mono text-slate-500">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[9px] font-mono text-slate-500 border border-slate-200/60 dark:border-slate-700/60">
                         {msg.modelUsed}
                       </span>
                     )}
 
                     <button
                       onClick={() => handleCopyMessage(msg.id, msg.content)}
-                      className="ml-auto opacity-0 group-hover:opacity-100 hover:text-slate-900 dark:hover:text-slate-100 transition-opacity p-0.5"
+                      className="ml-auto opacity-0 group-hover:opacity-100 hover:text-slate-900 dark:hover:text-slate-100 transition-opacity p-0.5 cursor-pointer"
                       title="Copy content"
                     >
                       {copiedMsgId === msg.id ? (
-                        <Check className="w-3 h-3 text-emerald-500" />
+                        <Check className="w-3.5 h-3.5 text-emerald-500" />
                       ) : (
-                        <Copy className="w-3 h-3" />
+                        <Copy className="w-3.5 h-3.5" />
                       )}
                     </button>
                   </div>

@@ -7,6 +7,7 @@ import {
   Calendar,
   Sparkles,
   Tag,
+  MapPin,
   Smile,
   BookOpen,
   Filter,
@@ -78,15 +79,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       id="sidebar-journal-history"
-      className="w-full sm:w-80 md:w-88 border-r border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 flex flex-col h-[calc(100vh-4rem)] shrink-0 z-20 transition-all"
+      className="w-full sm:w-80 md:w-88 border-r border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-[#0f172a]/90 flex flex-col h-[calc(100vh-4rem)] shrink-0 z-20 transition-all backdrop-blur-xs"
     >
       {/* Sidebar Header & New Button */}
-      <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-3">
+      <div className="p-4 border-b border-slate-200/70 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
             <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <h2 className="font-bold text-sm">Reflections History</h2>
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+            <h2 className="font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300">
+              Reflections Log
+            </h2>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
               {entries.length}
             </span>
           </div>
@@ -94,7 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             id="btn-sidebar-new-entry"
             onClick={onNewEntry}
-            className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 transition-colors"
+            className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer border border-indigo-200/60 dark:border-indigo-800/60 shadow-2xs"
             title="Start New Reflection"
           >
             <Plus className="w-4 h-4" />
@@ -107,10 +110,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <input
             id="input-search-entries"
             type="text"
-            placeholder="Search entries & reflections..."
+            placeholder="Search reflections & keywords..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8.5 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+            className="w-full pl-8.5 pr-3 py-1.5 text-xs bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 text-slate-900 dark:text-slate-100 placeholder-slate-400 shadow-2xs"
           />
         </div>
 
@@ -119,10 +122,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px] no-scrollbar">
             <button
               onClick={() => setSelectedTag(null)}
-              className={`px-2 py-0.5 rounded-md font-medium transition-colors shrink-0 ${
+              className={`px-2.5 py-1 rounded-md font-medium transition-all shrink-0 cursor-pointer ${
                 selectedTag === null
-                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs"
+                  : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/60 dark:border-slate-700/60"
               }`}
             >
               All
@@ -130,11 +133,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {allTags.map((tag) => (
               <button
                 key={tag}
+                title={`#${tag}`}
                 onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
-                className={`px-2 py-0.5 rounded-md font-medium transition-colors shrink-0 ${
+                className={`px-2.5 py-1 rounded-md font-medium transition-all shrink-0 max-w-[140px] truncate cursor-pointer ${
                   selectedTag === tag
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    ? "bg-indigo-600 text-white shadow-2xs"
+                    : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/60 dark:border-slate-700/60"
                 }`}
               >
                 #{tag}
@@ -145,7 +149,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Entries List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+      <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
         {sortedEntries.length === 0 ? (
           <div className="p-6 text-center text-slate-400 dark:text-slate-500 space-y-2">
             <p className="text-xs">No reflection entries found.</p>
@@ -168,10 +172,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => onSelectEntry(entry.id)}
                 className={`group relative p-3 rounded-xl cursor-pointer transition-all border ${
                   isActive
-                    ? "bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/80 shadow-xs"
-                    : "bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent hover:border-slate-200/60 dark:hover:border-slate-800"
+                    ? "bg-white dark:bg-slate-850 border-indigo-300 dark:border-indigo-700 shadow-xs ring-1 ring-indigo-500/10"
+                    : "bg-white/80 hover:bg-white dark:bg-slate-900/60 dark:hover:bg-slate-850 border-slate-200/60 hover:border-slate-300 dark:border-slate-800 hover:shadow-2xs"
                 }`}
               >
+                {isActive && (
+                  <span className="absolute left-0 top-3 bottom-3 w-1 bg-indigo-600 dark:bg-indigo-500 rounded-r-full" />
+                )}
+
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <div className="flex items-center gap-1.5 flex-1 min-w-0">
                     {entry.pinned && (
@@ -188,20 +196,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </h3>
                   </div>
 
-                  <span className="text-[10px] text-slate-400 shrink-0">
+                  <span className="text-[10px] text-slate-400 shrink-0 font-medium">
                     {formatDate(entry.updatedAt)}
                   </span>
                 </div>
 
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mb-2 leading-relaxed">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mb-2.5 leading-relaxed">
                   {entry.snippet || "Empty reflection session..."}
                 </p>
 
-                <div className="flex items-center justify-between pt-1 text-[10px]">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`px-1.5 py-0.5 rounded-sm font-medium ${modeMeta.color}`}>
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px]">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`px-1.5 py-0.5 rounded-sm font-semibold ${modeMeta.color}`}>
                       {modeMeta.label}
                     </span>
+                    {entry.location && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/50">
+                        <MapPin className="w-2.5 h-2.5" />
+                        <span className="truncate max-w-[80px]">{entry.location.placeName}</span>
+                      </span>
+                    )}
                     {entry.mood && (
                       <span className="px-1.5 py-0.5 rounded-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                         {entry.mood}
@@ -216,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         e.stopPropagation();
                         onTogglePin(entry.id, !entry.pinned);
                       }}
-                      className={`p-1 rounded-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors ${
+                      className={`p-1 rounded-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${
                         entry.pinned ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"
                       }`}
                       title={entry.pinned ? "Unpin entry" : "Pin entry to top"}

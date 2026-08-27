@@ -15,7 +15,7 @@ import {
   saveEntrySummary,
 } from "../lib/firebase";
 import { sendChatMessage, summarizeJournalEntry } from "../lib/geminiApi";
-import type { JournalEntry, JournalMessage, ReflectionMode } from "../types";
+import type { JournalEntry, JournalMessage, ReflectionMode, EntryLocation } from "../types";
 import { Loader2, Plus, Sparkles, BookOpen } from "lucide-react";
 
 interface DashboardProps {
@@ -46,6 +46,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
       (userEntries) => {
         setEntries(userEntries);
         setIsEntriesLoading(false);
+
+        // Auto-sanitize any accidental markdown summary tags from entries in Firestore
+        userEntries.forEach((entry) => {
+          if (entry.tags && Array.isArray(entry.tags)) {
+            const hasInvalidTags = entry.tags.some(
+              (t) =>
+                typeof t !== "string" ||
+                t.includes("\n") ||
+                t.includes("Executive Summary") ||
+                t.includes("Navigating Priorities") ||
+                t.length > 40
+            );
+            if (hasInvalidTags) {
+              const cleanedTags = entry.tags.filter(
+                (t) =>
+                  typeof t === "string" &&
+                  !t.includes("\n") &&
+                  !t.includes("Executive Summary") &&
+                  !t.includes("Navigating Priorities") &&
+                  t.length <= 40
+              );
+              updateJournalEntry(user.uid, entry.id, { tags: cleanedTags }).catch((err) => {
+                console.warn("[Firestore] Auto-cleaned invalid tag:", err);
+              });
+            }
+          }
+        });
 
         // Auto-select first entry if none is active or active was deleted
         if (userEntries.length > 0) {
@@ -148,11 +175,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   };
 
   // Handler: Add Tag
-  const handleAddTag = async (tag: string) => {
+  const handleAddTag = async (rawTag: string) => {
     if (!activeEntry || !activeEntryId) return;
+    const sanitizedTag = rawTag
+      .replace(/^#+/, "")
+      .replace(/[\r\n]+/g, " ")
+      .trim()
+      .slice(0, 30);
+    if (!sanitizedTag) return;
+
     const currentTags = activeEntry.tags || [];
-    if (!currentTags.includes(tag)) {
-      const updated = [...currentTags, tag];
+    if (!currentTags.includes(sanitizedTag)) {
+      const updated = [...currentTags, sanitizedTag];
       await updateJournalEntry(user.uid, activeEntryId, { tags: updated });
     }
   };
@@ -163,6 +197,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     const currentTags = activeEntry.tags || [];
     const updated = currentTags.filter((t) => t !== tag);
     await updateJournalEntry(user.uid, activeEntryId, { tags: updated });
+  };
+
+  // Handler: Update Pinned Location
+  const handleUpdateLocation = async (location: EntryLocation | null) => {
+    if (!activeEntryId) return;
+    try {
+      await updateJournalEntry(user.uid, activeEntryId, { location });
+    } catch (error) {
+      console.error("Failed to update entry location:", error);
+    }
   };
 
   // Handler: Send Message & Get Gemini Reflection
@@ -184,10 +228,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     setIsAiGenerating(true);
 
     try {
-      // 3. Call backend Gemini Chat API with fallback ladder
+      // 3. Call backend Gemini Chat API with fallback ladder & location context
       const response = await sendChatMessage({
         messages: conversationPayload,
         mode: activeEntry.mode,
+        location: activeEntry.location ? {
+          lat: activeEntry.location.lat,
+          lng: activeEntry.location.lng,
+          placeName: activeEntry.location.placeName,
+        } : null,
       });
 
       if (response.success && response.text) {
@@ -236,7 +285,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex flex-col">
+    <div className="min-h-screen bg-slate-100/75 dark:bg-[#0b0f17] flex flex-col antialiased">
       {/* Top Navigation */}
       <Navbar
         user={user}
@@ -300,6 +349,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
             onChangeMode={handleChangeMode}
             onAddTag={handleAddTag}
             onRemoveTag={handleRemoveTag}
+            onUpdateLocation={handleUpdateLocation}
             isInsightsOpen={isInsightsOpen}
             onToggleInsights={() => setIsInsightsOpen((prev) => !prev)}
           />

@@ -70,19 +70,19 @@ ${summary.suggestedTopics.map((t) => `- ${t}`).join("\n")}
   return (
     <aside
       id="insights-drawer"
-      className="w-full sm:w-88 md:w-96 border-l border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 flex flex-col h-[calc(100vh-4rem)] shrink-0 z-20 overflow-hidden"
+      className="w-full sm:w-88 md:w-96 border-l border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md flex flex-col h-[calc(100vh-4rem)] shrink-0 z-20 overflow-hidden shadow-2xs"
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+      <div className="flex items-center justify-between p-4 border-b border-slate-200/70 dark:border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60 shadow-2xs">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
               Synthesis & Insights
             </h3>
-            <span className="text-[10px] text-slate-400">Powered by Gemini 3.6 Flash</span>
+            <span className="text-[10px] text-slate-400 font-medium">Gemini 3.6 Flash Cognitive Engine</span>
           </div>
         </div>
 

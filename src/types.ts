@@ -19,6 +19,14 @@ export interface JournalMessage {
   failed?: boolean;
 }
 
+export interface EntryLocation {
+  lat: number;
+  lng: number;
+  placeName: string;
+  formattedAddress?: string;
+  placeId?: string;
+}
+
 export interface JournalEntry {
   id: string;
   userId: string;
@@ -32,6 +40,7 @@ export interface JournalEntry {
   messageCount: number;
   summary?: JournalSummary | null;
   pinned?: boolean;
+  location?: EntryLocation | null;
 }
 
 export interface ThreatModelItem {

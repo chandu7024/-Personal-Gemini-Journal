@@ -39,19 +39,24 @@ export const AuthLanding: React.FC<AuthLandingProps> = ({ onSignIn, onOpenThreat
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-100/75 dark:bg-[#0b0f17] text-slate-900 dark:text-slate-100 flex flex-col justify-between antialiased">
       {/* Top Simple Header */}
-      <header className="px-6 py-5 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md">
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-600 text-white shadow-xs">
-            <Sparkles className="w-4 h-4" />
+      <header className="px-6 py-4 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 text-white shadow-xs ring-1 ring-white/20 dark:ring-slate-700/50">
+            <Sparkles className="w-4.5 h-4.5 text-indigo-100" />
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white dark:ring-slate-900" />
           </div>
-          <span className="font-bold text-lg tracking-tight">ReflectAI</span>
+          <div>
+            <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-slate-100">
+              Reflect<span className="text-indigo-600 dark:text-indigo-400">AI</span>
+            </span>
+          </div>
         </div>
         <button
           id="btn-threat-model-landing"
           onClick={onOpenThreatModel}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer shadow-2xs"
         >
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
           Threat Model & Security

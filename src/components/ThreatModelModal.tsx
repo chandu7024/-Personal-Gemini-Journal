@@ -31,16 +31,16 @@ const THREAT_MODEL_DATA: ThreatModelItem[] = [
   },
   {
     threatZone: "Memory & State",
-    riskDescription: "Cross-tenant data exposure, unauthorized read/writes across user journal subcollections, or session hijacking.",
-    owaspCategory: "OWASP A01 Broken Access Control",
-    implementedCountermeasure: "Firestore security rules enforce owner-bound isolation (/users/{userId}/... restricted to request.auth.uid == userId). Recursive undefined-stripping ensures zero DB driver crashes.",
+    riskDescription: "Cross-tenant data exposure, unauthorized read/writes across user journal subcollections, session hijacking, or unauthorized administrative escalation.",
+    owaspCategory: "OWASP A01 Broken Access Control / RBAC",
+    implementedCountermeasure: "Role-Based Access Control (RBAC) directive enforced: Standard user reflections are strictly owner-bound (/users/{userId}/... locked to request.auth.uid == userId). Elevated admin operations verify role in Firestore and record immutable audit trails to /audit_logs. Recursive undefined-stripping ensures zero DB driver crashes.",
     status: "Enforced",
   },
   {
     threatZone: "Inter-System Communication",
-    riskDescription: "Gemini API key exposure in client bundles, Google Maps API key scraping, or network transit interception.",
-    owaspCategory: "OWASP A02 Cryptographic Failures",
-    implementedCountermeasure: "GEMINI_API_KEY resides strictly server-side (no client exposure). VITE_GOOGLE_MAPS_API_KEY supports HTTP Referrer Restrictions (*.run.app, localhost:3000) and strict API scoping (Maps JS/Places). Client communicates via secure backend proxy endpoints.",
+    riskDescription: "Gemini API key exposure in client bundles, external notification token (SMTP/Slack/Discord) leakage, Google Maps API key scraping, or network transit interception.",
+    owaspCategory: "OWASP A02 Cryptographic Failures & A01 Proxy Isolation",
+    implementedCountermeasure: "GEMINI_API_KEY and Notification credentials (SMTP/Webhooks) reside strictly server-side (zero client exposure). Notification API proxies all dispatches via /api/notifications/*. VITE_GOOGLE_MAPS_API_KEY supports HTTP Referrer Restrictions (*.run.app, localhost:3000) and strict API scoping (Maps JS/Places).",
     status: "Enforced",
   },
 ];

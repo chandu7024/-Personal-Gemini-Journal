@@ -51,11 +51,72 @@ export interface ThreatModelItem {
   status: "Enforced" | "Active";
 }
 
+export type UserRole = "admin" | "user" | "super_admin";
+
 export interface UserProfile {
   uid: string;
   displayName: string | null;
   email: string | null;
   photoURL: string | null;
+  role: UserRole;
   createdAt: string;
   lastLogin: string;
+  totalReflections?: number;
 }
+
+export interface SystemAuditLog {
+  id: string;
+  action: string;
+  actorEmail: string;
+  actorUid: string;
+  targetResource?: string;
+  status: "success" | "warning" | "error";
+  details: string;
+  timestamp: string;
+}
+
+export interface SystemTelemetry {
+  geminiCalls24h: number;
+  avgLatencyMs: number;
+  fallbackTriggerRate: number;
+  activeUsersCount: number;
+  totalReflectionsCount: number;
+  uptimePercentage: number;
+}
+
+export type NotificationChannel = "email" | "slack" | "discord";
+
+export interface EmailNotificationPayload {
+  recipientEmail: string;
+  entryTitle: string;
+  executiveSummary: string;
+  keyInsights: string[];
+  actionItems: string[];
+  mood?: string;
+  tags?: string[];
+  locationName?: string;
+  formattedDate: string;
+}
+
+export interface NotificationDispatchResult {
+  success: boolean;
+  channel: NotificationChannel;
+  recipient: string;
+  messageId?: string;
+  deliveredAt: string;
+  previewHtml?: string;
+  mode: "live_smtp_delivered" | "preview_unconfigured";
+  smtpConfigured: boolean;
+  statusMessage?: string;
+  mailtoUrl?: string;
+  gmailWebUrl?: string;
+  error?: string;
+}
+
+export interface NotificationEngineStatus {
+  smtpConfigured: boolean;
+  smtpHost?: string;
+  slackConfigured: boolean;
+  discordConfigured: boolean;
+}
+

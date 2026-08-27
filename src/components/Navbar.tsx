@@ -7,26 +7,33 @@ import {
   BookOpen,
   PanelLeftClose,
   PanelLeftOpen,
+  ShieldAlert,
 } from "lucide-react";
 import type { User } from "firebase/auth";
+import type { UserRole } from "../types";
 
 interface NavbarProps {
   user: User | null;
+  userRole?: UserRole;
   onSignOut: () => void;
   onNewEntry: () => void;
   onOpenThreatModel: () => void;
+  onOpenAdminConsole?: () => void;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   user,
+  userRole = "user",
   onSignOut,
   onNewEntry,
   onOpenThreatModel,
+  onOpenAdminConsole,
   isSidebarOpen,
   onToggleSidebar,
 }) => {
+  const isAdmin = userRole === "admin" || userRole === "super_admin";
   return (
     <header
       id="main-navbar"
@@ -85,6 +92,25 @@ export const Navbar: React.FC<NavbarProps> = ({
           <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           <span className="hidden md:inline">Threat Model</span>
         </button>
+
+        {onOpenAdminConsole && (
+          <button
+            id="btn-admin-console"
+            onClick={onOpenAdminConsole}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-medium rounded-lg transition-all cursor-pointer border ${
+              isAdmin
+                ? "bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 shadow-2xs"
+                : "bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-300"
+            }`}
+            title="Open Executive Admin Dashboard (RBAC)"
+          >
+            <ShieldAlert className={`w-4 h-4 ${isAdmin ? "text-purple-600 dark:text-purple-400" : "text-slate-400"}`} />
+            <span className="hidden md:inline">Admin Console</span>
+            {isAdmin && (
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+            )}
+          </button>
+        )}
 
         {user && (
           <div className="flex items-center gap-2 pl-2.5 border-l border-slate-200 dark:border-slate-800">

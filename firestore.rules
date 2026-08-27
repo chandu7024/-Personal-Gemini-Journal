@@ -1,19 +1,35 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // User profile document
+    
+    // RBAC Helper: Check if requesting user has elevated administrative role
+    function isAdmin() {
+      return request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
+    }
+
+    // User profiles & RBAC
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Users can read/write their own profile; Admins can read all profiles and update roles
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
       
-      // Journal entries collection isolated strictly to the authenticated user
+      // Personal journal entries collection: Strictly isolated to the owner
       match /entries/{entryId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
         
-        // Multi-turn messages / reflections subcollection
+        // Multi-turn reflective messages subcollection
         match /messages/{messageId} {
           allow read, write: if request.auth != null && request.auth.uid == userId;
         }
       }
     }
+
+    // System security audit logs: Write by authenticated actors, read restricted to admins
+    match /audit_logs/{logId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if isAdmin();
+    }
   }
 }
+

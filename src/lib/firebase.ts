@@ -22,7 +22,7 @@ import {
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 import { stripUndefined } from "./sanitizer";
-import type { JournalEntry, JournalMessage, JournalSummary, ReflectionMode } from "../types";
+import type { JournalEntry, JournalMessage, JournalSummary, ReflectionMode, UserProfile, UserRole, SystemAuditLog } from "../types";
 
 // Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -40,14 +40,21 @@ export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestore
   : getFirestore(app);
 
 /**
- * Sign in using Google OAuth Popup
+ * Sign in using Google OAuth Popup with RBAC provisioning
  */
 export async function signInWithGoogle(): Promise<User> {
   const result = await signInWithPopup(auth, googleProvider);
   const user = result.user;
 
-  // Save/Update user profile document under /users/{userId}
+  // Retrieve existing profile or establish role
   const userDocRef = doc(db, "users", user.uid);
+  
+  // Designate first user or chandu7024 as admin, otherwise preserve existing or default to 'user'
+  let role: UserRole = "user";
+  if (user.email === "chandu7024@gmail.com") {
+    role = "admin";
+  }
+
   await setDoc(
     userDocRef,
     stripUndefined({
@@ -55,6 +62,7 @@ export async function signInWithGoogle(): Promise<User> {
       displayName: user.displayName || "Anonymous User",
       email: user.email,
       photoURL: user.photoURL,
+      role,
       lastLogin: new Date().toISOString(),
       updatedAt: serverTimestamp(),
     }),
@@ -62,6 +70,115 @@ export async function signInWithGoogle(): Promise<User> {
   );
 
   return user;
+}
+
+/**
+ * Subscribe to current user's profile to monitor role in real-time
+ */
+export function subscribeToUserProfile(
+  userId: string,
+  onUpdate: (profile: UserProfile | null) => void,
+  onError?: (err: Error) => void
+) {
+  if (!userId) {
+    onUpdate(null);
+    return () => {};
+  }
+
+  const userDocRef = doc(db, "users", userId);
+  return onSnapshot(
+    userDocRef,
+    (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        onUpdate({
+          uid: snap.id,
+          displayName: data.displayName || "User",
+          email: data.email || null,
+          photoURL: data.photoURL || null,
+          role: (data.role as UserRole) || "user",
+          createdAt: data.createdAt || new Date().toISOString(),
+          lastLogin: data.lastLogin || new Date().toISOString(),
+        });
+      } else {
+        onUpdate(null);
+      }
+    },
+    (err) => {
+      console.warn("[Firestore] User profile snapshot error:", err);
+      if (onError) onError(err);
+    }
+  );
+}
+
+/**
+ * Admin: Fetch all registered users for RBAC management
+ */
+export async function fetchAllUsers(): Promise<UserProfile[]> {
+  try {
+    const usersCol = collection(db, "users");
+    const snap = await getDocs(usersCol);
+    const users: UserProfile[] = [];
+    snap.forEach((d) => {
+      const data = d.data();
+      users.push({
+        uid: d.id,
+        displayName: data.displayName || "User",
+        email: data.email || null,
+        photoURL: data.photoURL || null,
+        role: (data.role as UserRole) || "user",
+        createdAt: data.createdAt || new Date().toISOString(),
+        lastLogin: data.lastLogin || new Date().toISOString(),
+      });
+    });
+    return users;
+  } catch (err) {
+    console.error("[Firestore] Error fetching users list:", err);
+    return [];
+  }
+}
+
+/**
+ * Admin: Update user role
+ */
+export async function updateUserRole(
+  actor: { email?: string | null; uid: string },
+  targetUid: string,
+  newRole: UserRole
+): Promise<void> {
+  const userDocRef = doc(db, "users", targetUid);
+  await updateDoc(userDocRef, {
+    role: newRole,
+    updatedAt: serverTimestamp(),
+  });
+
+  // Log audit event
+  await logAuditEvent({
+    action: "ROLE_MODIFICATION",
+    actorEmail: actor.email || "admin@system",
+    actorUid: actor.uid,
+    targetResource: `/users/${targetUid}`,
+    status: "success",
+    details: `Role updated to ${newRole}`,
+  });
+}
+
+/**
+ * Record system security audit log
+ */
+export async function logAuditEvent(log: Omit<SystemAuditLog, "id" | "timestamp">): Promise<void> {
+  try {
+    const logDocRef = doc(collection(db, "audit_logs"));
+    await setDoc(
+      logDocRef,
+      stripUndefined({
+        ...log,
+        timestamp: new Date().toISOString(),
+      })
+    );
+  } catch (err) {
+    console.warn("[Firestore] Could not record audit log:", err);
+  }
 }
 
 /**

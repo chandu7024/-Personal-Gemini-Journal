@@ -13,11 +13,19 @@ import {
   Check,
   RefreshCw,
   Loader2,
+  Mail,
+  Send,
+  ExternalLink,
+  ShieldCheck,
+  Eye,
 } from "lucide-react";
-import type { JournalSummary } from "../types";
+import type { JournalSummary, JournalEntry } from "../types";
+import { sendEmailNotification } from "../lib/notifications";
 
 interface InsightsDrawerProps {
   summary: JournalSummary | null;
+  entry?: JournalEntry | null;
+  userEmail?: string | null;
   isLoading: boolean;
   onSynthesize: () => void;
   isOpen: boolean;
@@ -26,6 +34,8 @@ interface InsightsDrawerProps {
 
 export const InsightsDrawer: React.FC<InsightsDrawerProps> = ({
   summary,
+  entry,
+  userEmail,
   isLoading,
   onSynthesize,
   isOpen,
@@ -33,6 +43,20 @@ export const InsightsDrawer: React.FC<InsightsDrawerProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [completedActions, setCompletedActions] = useState<Record<number, boolean>>({});
+  
+  // Email Notification States
+  const [recipientEmail, setRecipientEmail] = useState(userEmail || "chandu7024@gmail.com");
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+    mode?: "live_smtp_delivered" | "preview_unconfigured";
+    mailtoUrl?: string;
+    gmailWebUrl?: string;
+    smtpConfigured?: boolean;
+  } | null>(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -66,6 +90,56 @@ ${summary.suggestedTopics.map((t) => `- ${t}`).join("\n")}
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const handleSendEmail = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!summary || !recipientEmail) return;
+
+    setIsSendingEmail(true);
+    setEmailStatus(null);
+
+    try {
+      const result = await sendEmailNotification({
+        recipientEmail,
+        entryTitle: summary.title || entry?.title || "Reflective Journal Entry",
+        executiveSummary: summary.executiveSummary,
+        keyInsights: summary.keyInsights || [],
+        actionItems: summary.actionItems || [],
+        mood: summary.mood,
+        tags: entry?.tags || [],
+        locationName: entry?.location?.placeName,
+        formattedDate: new Date().toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
+      });
+
+      setEmailStatus({
+        type: "success",
+        message: result.statusMessage || (result.mode === "live_smtp_delivered"
+          ? `Live email delivered to ${recipientEmail} via SMTP.`
+          : `Email synthesized & preview ready.`),
+        mode: result.mode,
+        mailtoUrl: result.mailtoUrl,
+        gmailWebUrl: result.gmailWebUrl,
+        smtpConfigured: result.smtpConfigured,
+      });
+
+      if (result.previewHtml) {
+        setPreviewHtml(result.previewHtml);
+      }
+    } catch (err: any) {
+      console.error("Email notification dispatch error:", err);
+      setEmailStatus({
+        type: "error",
+        message: err.message || "Failed to dispatch email notification.",
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
 
   return (
     <aside
@@ -248,30 +322,208 @@ ${summary.suggestedTopics.map((t) => `- ${t}`).join("\n")}
                 </div>
               </div>
             )}
+            {/* Email Dispatch Status Banner */}
+            {emailStatus && (
+              <div
+                className={`p-3.5 rounded-xl text-xs flex items-start gap-2.5 ${
+                  emailStatus.type === "success"
+                    ? emailStatus.mode === "live_smtp_delivered"
+                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                      : "bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800"
+                    : "bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                }`}
+              >
+                {emailStatus.type === "success" ? (
+                  <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                ) : (
+                  <X className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold">
+                      {emailStatus.type === "success"
+                        ? emailStatus.mode === "live_smtp_delivered"
+                          ? "Live SMTP Email Delivered"
+                          : "Email Payload Synthesized"
+                        : "Dispatch Failed"}
+                    </p>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                      {emailStatus.mode === "live_smtp_delivered" ? "Live SMTP" : "Preview / Mailto Ready"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed opacity-90">{emailStatus.message}</p>
+                  
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {emailStatus.gmailWebUrl && (
+                      <a
+                        href={emailStatus.gmailWebUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-semibold hover:bg-indigo-700 transition-colors shadow-2xs"
+                      >
+                        <Mail className="w-3 h-3" />
+                        <span>Send via Gmail Web</span>
+                      </a>
+                    )}
+                    {emailStatus.mailtoUrl && (
+                      <a
+                        href={emailStatus.mailtoUrl}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <span>Open in Mail App</span>
+                      </a>
+                    )}
+                    {previewHtml && (
+                      <button
+                        onClick={() => setShowEmailModal(true)}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 underline hover:no-underline cursor-pointer ml-auto"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>Inspect HTML</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
 
-      {/* Footer Copy button */}
+      {/* Footer Action buttons */}
       {summary && (
-        <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-          <button
-            id="btn-copy-synthesis"
-            onClick={handleCopyMarkdown}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-          >
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Copied Markdown to Clipboard!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" />
-                <span>Copy Formatted Synthesis</span>
-              </>
-            )}
-          </button>
+        <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              id="btn-copy-synthesis"
+              onClick={handleCopyMarkdown}
+              className="flex items-center justify-center gap-1.5 py-2 px-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Copy Text</span>
+                </>
+              )}
+            </button>
+
+            <button
+              id="btn-email-synthesis"
+              onClick={() => setShowEmailModal(true)}
+              className="flex items-center justify-center gap-1.5 py-2 px-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-2xs transition-colors cursor-pointer"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              <span>Email Summary</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Email Dispatch & Preview Modal */}
+      {showEmailModal && summary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Dispatch Reflection Email
+                  </h3>
+                  <span className="text-[10px] text-slate-400">
+                    Notification Directive (OWASP A01 / Server Proximity)
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowEmailModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSendEmail} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Recipient Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800 text-xs space-y-1.5">
+                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-[11px]">
+                  <span>Subject</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">ReflectAI Executive Synthesis</span>
+                </div>
+                <div className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                  {summary.title || "Reflective Journal Entry"}
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">
+                  {summary.executiveSummary}
+                </p>
+              </div>
+
+              {/* Live HTML Preview Accordion / Frame */}
+              {previewHtml && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                    <span>Rendered Email Payload</span>
+                    <span className="text-emerald-600 font-mono text-[10px]">Validated HTML</span>
+                  </div>
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-48 overflow-y-auto bg-slate-50 dark:bg-slate-950 p-2">
+                    <iframe
+                      title="Email Preview"
+                      srcDoc={previewHtml}
+                      className="w-full h-40 border-0 rounded bg-white"
+                      sandbox="allow-same-origin"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowEmailModal(false)}
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSendingEmail}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Dispatching...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Send Notification</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </aside>

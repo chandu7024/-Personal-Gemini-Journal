@@ -5,9 +5,11 @@ import { Sidebar } from "./Sidebar";
 import { EntryWorkspace } from "./EntryWorkspace";
 import { InsightsDrawer } from "./InsightsDrawer";
 import { ThreatModelModal } from "./ThreatModelModal";
+import { AdminDashboardModal } from "./AdminDashboardModal";
 import {
   subscribeToUserEntries,
   subscribeToEntryMessages,
+  subscribeToUserProfile,
   createJournalEntry,
   updateJournalEntry,
   deleteJournalEntry,
@@ -15,7 +17,7 @@ import {
   saveEntrySummary,
 } from "../lib/firebase";
 import { sendChatMessage, summarizeJournalEntry } from "../lib/geminiApi";
-import type { JournalEntry, JournalMessage, ReflectionMode, EntryLocation } from "../types";
+import type { JournalEntry, JournalMessage, ReflectionMode, EntryLocation, UserRole } from "../types";
 import { Loader2, Plus, Sparkles, BookOpen } from "lucide-react";
 
 interface DashboardProps {
@@ -27,6 +29,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const [messages, setMessages] = useState<JournalMessage[]>([]);
+  const [userRole, setUserRole] = useState<UserRole>(user.email === "chandu7024@gmail.com" ? "admin" : "user");
   
   const [isEntriesLoading, setIsEntriesLoading] = useState(true);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
@@ -35,6 +38,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isThreatModalOpen, setIsThreatModalOpen] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+
+  // Subscribe to user profile to monitor role in real-time
+  useEffect(() => {
+    if (!user.uid) return;
+    const unsubscribeProfile = subscribeToUserProfile(user.uid, (profile) => {
+      if (profile && profile.role) {
+        setUserRole(profile.role);
+      }
+    });
+    return () => unsubscribeProfile();
+  }, [user.uid]);
 
   // 1. Subscribe to User's Journal Entries (Isolated by user.uid in Firestore)
   useEffect(() => {
@@ -289,9 +304,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
       {/* Top Navigation */}
       <Navbar
         user={user}
+        userRole={userRole}
         onSignOut={onSignOut}
         onNewEntry={handleNewEntry}
         onOpenThreatModel={() => setIsThreatModalOpen(true)}
+        onOpenAdminConsole={() => setIsAdminModalOpen(true)}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
       />
@@ -359,6 +376,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         {activeEntry && (
           <InsightsDrawer
             summary={activeEntry.summary || null}
+            entry={activeEntry}
+            userEmail={user.email}
             isLoading={isSynthesizing}
             onSynthesize={handleSynthesize}
             isOpen={isInsightsOpen}
@@ -371,6 +390,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
       <ThreatModelModal
         isOpen={isThreatModalOpen}
         onClose={() => setIsThreatModalOpen(false)}
+      />
+
+      {/* Admin Dashboard Modal */}
+      <AdminDashboardModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        currentUser={{
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+        }}
+        currentRole={userRole}
       />
     </div>
   );

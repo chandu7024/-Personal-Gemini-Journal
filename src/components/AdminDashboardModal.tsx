@@ -17,6 +17,7 @@ import {
   Send,
   Bell,
   Check,
+  AlertCircle,
 } from "lucide-react";
 import type { UserProfile, UserRole, SystemAuditLog, SystemTelemetry } from "../types";
 import { fetchAllUsers, updateUserRole } from "../lib/firebase";
@@ -45,7 +46,14 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   const [testChannel, setTestChannel] = useState<"email" | "slack" | "discord">("email");
   const [testTarget, setTestTarget] = useState(currentUser.email || "chandu7024@gmail.com");
   const [isTestingNotification, setIsTestingNotification] = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+    mode?: string;
+    details?: string;
+    mailtoUrl?: string;
+    gmailWebUrl?: string;
+  } | null>(null);
 
 
   // Simulated live telemetry metrics for demonstration
@@ -548,9 +556,18 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                               entryTitle: "Executive Quarterly Strategy Reflection",
                               executiveSummary: "Analyzed product velocity, identified 3 cognitive biases in resource allocation, and committed to high-agency milestones.",
                             });
-                            setTestResult(`Dispatched test event to ${res.recipient} [ID: ${res.messageId}] (${res.mode})`);
+                            setTestResult({
+                              success: true,
+                              message: res.statusMessage || `Dispatched test event to ${res.recipient} [ID: ${res.messageId}] (${res.mode})`,
+                              mode: res.mode,
+                              mailtoUrl: res.mailtoUrl,
+                              gmailWebUrl: res.gmailWebUrl,
+                            });
                           } catch (err: any) {
-                            setTestResult(`Failed: ${err.message}`);
+                            setTestResult({
+                              success: false,
+                              message: err.message || "Failed to execute notification test.",
+                            });
                           } finally {
                             setIsTestingNotification(false);
                           }
@@ -570,10 +587,37 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                 </div>
 
                 {testResult && (
-                  <div className="p-3 rounded-lg bg-slate-900 text-slate-100 font-mono text-[11px] border border-slate-800 space-y-1.5">
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
-                      <Check className="w-4 h-4 shrink-0 text-emerald-500" />
-                      <span>{testResult}</span>
+                  <div
+                    className={`p-3 rounded-lg font-mono text-[11px] border space-y-2 ${
+                      testResult.success
+                        ? "bg-slate-900 text-slate-100 border-slate-800"
+                        : "bg-rose-950/40 text-rose-200 border-rose-800"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      {testResult.success ? (
+                        <Check className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                      )}
+                      <div className="flex-1 space-y-1">
+                        <p className={testResult.success ? "text-emerald-400 font-bold" : "text-rose-300 font-semibold"}>
+                          {testResult.message}
+                        </p>
+                        {testResult.gmailWebUrl && (
+                          <div className="pt-1 flex items-center gap-2">
+                            <a
+                              href={testResult.gmailWebUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-sans text-xs font-semibold"
+                            >
+                              <Mail className="w-3 h-3" />
+                              <span>Open in Gmail Web Composer</span>
+                            </a>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

@@ -398,28 +398,77 @@ function buildDirectMailLinks(payload: {
 }
 
 /**
- * Helper to create nodemailer transporter if credentials are provided in env
+ * Helper to normalize and configure nodemailer transporter
  */
 function getMailTransporter() {
-  const host = process.env.NOTIFICATION_EMAIL_HOST;
-  const user = process.env.NOTIFICATION_EMAIL_USER;
-  const pass = process.env.NOTIFICATION_EMAIL_PASS;
-  const port = parseInt(process.env.NOTIFICATION_EMAIL_PORT || "587", 10);
-  const secure = port === 465;
+  let host = (process.env.NOTIFICATION_EMAIL_HOST || "").trim();
+  const user = (process.env.NOTIFICATION_EMAIL_USER || "").trim();
+  let pass = (process.env.NOTIFICATION_EMAIL_PASS || "").trim();
+  const portStr = (process.env.NOTIFICATION_EMAIL_PORT || "").trim();
 
-  if (!host || !user || !pass) {
+  // If user provided a password with spaces (e.g., copied 16-character Google App Password 'abcd efgh ijkl mnop'), strip spaces
+  if (pass) {
+    pass = pass.replace(/\s+/g, "");
+  }
+
+  // Auto-detect & auto-correct common host misconfigurations:
+  // If host was mistakenly set to the user's email (e.g. 'chandu610314@gmail.com') or 'gmail.com'
+  if (host.includes("@") || host.toLowerCase().includes("gmail") || host === "") {
+    if (host.includes("gmail") || user.includes("gmail") || host.includes("@")) {
+      host = "smtp.gmail.com";
+    }
+  }
+
+  if (!user || !pass) {
     return null;
   }
 
+  const isGmail = host === "smtp.gmail.com" || user.toLowerCase().endsWith("@gmail.com");
+  const port = portStr ? parseInt(portStr, 10) : isGmail ? 465 : 587;
+  const secure = port === 465;
+
+  if (isGmail) {
+    return nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user,
+        pass,
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    });
+  }
+
   return nodemailer.createTransport({
-    host,
+    host: host || "smtp.gmail.com",
     port,
     secure,
     auth: {
       user,
       pass,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
+}
+
+/**
+ * Format email dispatch errors into actionable human-readable explanations
+ */
+function formatEmailError(error: any): string {
+  const msg = error?.message || String(error);
+  if (msg.includes("ENOTFOUND")) {
+    return `DNS Resolution Error: Could not reach SMTP host. If using Gmail, ensure NOTIFICATION_EMAIL_HOST="smtp.gmail.com" and NOTIFICATION_EMAIL_USER is your email address.`;
+  }
+  if (msg.includes("EAUTH") || msg.includes("Invalid login") || msg.includes("Username and Password not accepted")) {
+    return `Authentication Failed (535): Gmail rejected credentials. Note: Google requires a 16-digit 'App Password' (generated at myaccount.google.com/apppasswords), not your standard Google account password.`;
+  }
+  if (msg.includes("ETIMEDOUT") || msg.includes("timeout")) {
+    return `Connection Timed Out: Unable to connect to SMTP server on the configured port.`;
+  }
+  return msg;
 }
 
 // API Notification Engine Status Check
@@ -546,8 +595,9 @@ app.post("/api/notifications/email", async (req, res) => {
     }
   } catch (error: any) {
     console.error("[API Error] /api/notifications/email failure:", error);
+    const friendlyMsg = formatEmailError(error);
     return res.status(500).json({
-      error: error?.message || "Failed to dispatch email notification.",
+      error: friendlyMsg,
       success: false,
       smtpConfigured: Boolean(getMailTransporter()),
     });
@@ -610,8 +660,9 @@ app.post("/api/notifications/test", async (req, res) => {
     });
   } catch (error: any) {
     console.error("[API Error] /api/notifications/test failure:", error);
+    const friendlyMsg = formatEmailError(error);
     return res.status(500).json({
-      error: error?.message || "Failed to execute test notification.",
+      error: friendlyMsg,
       success: false,
     });
   }

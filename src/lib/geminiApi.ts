@@ -1,4 +1,12 @@
-import type { JournalMessage, JournalSummary, ReflectionMode, CognitiveAnalysisResult, InstantReframeResult } from "../types";
+import type {
+  JournalMessage,
+  JournalSummary,
+  ReflectionMode,
+  CognitiveAnalysisResult,
+  InstantReframeResult,
+  JournalEntry,
+  LongitudinalAuditResult,
+} from "../types";
 import { sanitizeInput } from "./sanitizer";
 
 export interface ChatResponse {
@@ -151,3 +159,61 @@ export async function reframeSingleThought(thoughtText: string): Promise<Instant
 
   return response.json();
 }
+
+/**
+ * Request Longitudinal Cognitive Growth and Blind-Spot Audit across multi-entry timeline
+ */
+export async function requestLongitudinalAudit(params: {
+  timeRange: string;
+  entries: JournalEntry[];
+}): Promise<{ success: boolean; audit: LongitudinalAuditResult }> {
+  // Sanitize payloads to strip private identifiers
+  const sanitizedEntries = params.entries.map((e) => ({
+    id: e.id,
+    title: sanitizeInput(e.title),
+    createdAt: e.createdAt,
+    mode: e.mode,
+    mood: e.mood,
+    snippet: e.snippet ? sanitizeInput(e.snippet) : undefined,
+    summary: e.summary
+      ? {
+          title: sanitizeInput(e.summary.title),
+          executiveSummary: sanitizeInput(e.summary.executiveSummary),
+          keyInsights: e.summary.keyInsights.map(sanitizeInput),
+          actionItems: e.summary.actionItems.map(sanitizeInput),
+        }
+      : null,
+    cognitiveAnalysis: e.cognitiveAnalysis
+      ? {
+          flexibilityScore: e.cognitiveAnalysis.flexibilityScore,
+          agencyScore: e.cognitiveAnalysis.agencyScore,
+          emotionalResilienceScore: e.cognitiveAnalysis.emotionalResilienceScore,
+          dominantThoughtPattern: e.cognitiveAnalysis.dominantThoughtPattern,
+          biasesDetected: e.cognitiveAnalysis.biasesDetected.map((b) => ({
+            name: b.name,
+            category: b.category,
+            triggerQuote: sanitizeInput(b.triggerQuote),
+          })),
+        }
+      : null,
+  }));
+
+  const response = await fetch("/api/analytics/longitudinal-audit", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      timeRange: params.timeRange,
+      entries: sanitizedEntries,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Server responded with status ${response.status}`);
+  }
+
+  return response.json();
+}
+

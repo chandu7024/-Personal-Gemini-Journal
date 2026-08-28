@@ -157,3 +157,49 @@ export interface NotificationEngineStatus {
   discordConfigured: boolean;
 }
 
+export type TimeWindow = "7d" | "30d" | "90d" | "all";
+
+export interface RecurringBlindSpot {
+  distortionName: string;
+  occurrenceCount: number;
+  primaryTrigger: string;
+  shiftObserved: string;
+  recommendedMicroPractice: string;
+  trend: "improving" | "increasing" | "stable";
+}
+
+export interface VitalityTrendDataPoint {
+  id?: string;
+  date: string;
+  entryTitle: string;
+  flexibilityScore: number;
+  agencyScore: number;
+  resilienceScore: number;
+  biasesCount: number;
+  mood: string;
+}
+
+export interface BehavioralExperiment {
+  title: string;
+  hypothesis: string;
+  actionSteps: string[];
+  targetDistortion?: string;
+}
+
+export interface LongitudinalAuditResult {
+  timeRangeAnalyzed: string;
+  entriesCount: number;
+  growthSummary: string;
+  keyBreakthroughMilestones: string[];
+  topRecurringBlindSpots: RecurringBlindSpot[];
+  vitalityTrends: {
+    flexibilityDelta: string;
+    agencyDelta: string;
+    resilienceDelta: string;
+  };
+  customBehavioralExperiment: BehavioralExperiment;
+  analyzedAt: string;
+  modelUsed?: string;
+}
+
+

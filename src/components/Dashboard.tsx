@@ -6,6 +6,7 @@ import { EntryWorkspace } from "./EntryWorkspace";
 import { InsightsDrawer } from "./InsightsDrawer";
 import { ThreatModelModal } from "./ThreatModelModal";
 import { AdminDashboardModal } from "./AdminDashboardModal";
+import { CognitiveAnalyticsHub } from "./CognitiveAnalyticsHub";
 import {
   subscribeToUserEntries,
   subscribeToEntryMessages,
@@ -41,6 +42,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isThreatModalOpen, setIsThreatModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
 
   // Subscribe to user profile to monitor role in real-time
   useEffect(() => {
@@ -344,6 +346,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         onNewEntry={handleNewEntry}
         onOpenThreatModel={() => setIsThreatModalOpen(true)}
         onOpenAdminConsole={() => setIsAdminModalOpen(true)}
+        onOpenAnalytics={() => setIsAnalyticsModalOpen(true)}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
       />
@@ -442,6 +445,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           displayName: user.displayName,
         }}
         currentRole={userRole}
+      />
+
+      {/* Longitudinal Cognitive Growth & Distortion Radar Modal */}
+      <CognitiveAnalyticsHub
+        isOpen={isAnalyticsModalOpen}
+        onClose={() => setIsAnalyticsModalOpen(false)}
+        entries={entries}
+        onOpenEntry={(id) => {
+          setActiveEntryId(id);
+          setIsAnalyticsModalOpen(false);
+        }}
       />
     </div>
   );

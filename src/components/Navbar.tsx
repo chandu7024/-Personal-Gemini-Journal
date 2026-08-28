@@ -8,6 +8,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ShieldAlert,
+  Brain,
+  TrendingUp,
 } from "lucide-react";
 import type { User } from "firebase/auth";
 import type { UserRole } from "../types";
@@ -19,6 +21,7 @@ interface NavbarProps {
   onNewEntry: () => void;
   onOpenThreatModel: () => void;
   onOpenAdminConsole?: () => void;
+  onOpenAnalytics?: () => void;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
 }
@@ -30,6 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNewEntry,
   onOpenThreatModel,
   onOpenAdminConsole,
+  onOpenAnalytics,
   isSidebarOpen,
   onToggleSidebar,
 }) => {
@@ -92,6 +96,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           <span className="hidden md:inline">Threat Model</span>
         </button>
+
+        {onOpenAnalytics && (
+          <button
+            id="btn-cognitive-analytics-nav"
+            onClick={onOpenAnalytics}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50/90 dark:bg-indigo-950/70 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 border border-indigo-200/70 dark:border-indigo-800/60 rounded-lg transition-colors cursor-pointer shadow-2xs"
+            title="Open Longitudinal Cognitive Growth & Distortion Radar"
+          >
+            <Brain className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <span className="hidden md:inline">Cognitive Analytics</span>
+          </button>
+        )}
 
         {onOpenAdminConsole && (
           <button

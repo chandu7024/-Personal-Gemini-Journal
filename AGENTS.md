@@ -95,3 +95,53 @@ Notifications should be dispatched or queued when specific journal entry parsing
 * All dispatched notifications must produce an immutable record in `/audit_logs` detailing channel, recipient hash, timestamp, and delivery status.
 * Limit repetitive webhook dispatches to prevent notification spam or quota exhaustion.
 
+# Longitudinal Cognitive Growth & Distortion Analytics Directive
+
+## 1. User Isolation & Privacy Guardrails
+* **Strict Tenant Scoping**: Longitudinal aggregation across multiple journal entries must strictly query only documents belonging to the authenticated user (`/users/{userId}/entries/*`). Cross-user trend comparisons or aggregated behavioral tracking without explicit anonymization are strictly prohibited.
+* **Ephemeral Synthesis Payloads**: When dispatching multi-entry historical summaries to the Gemini API for longitudinal audits, all entry payloads must be sanitized to strip external PII and limit raw token exposure.
+
+## 2. Metric Computation & Time-Series Standards
+* **Windowing Intervals**: Support dynamic time-slices (7-Day, 30-Day, 90-Day, All-Time).
+* **Cognitive Vitality Indices**: Calculate rolling moving averages for:
+  - **Cognitive Flexibility Index** (0–100): Inverse correlation with rigid distortion frequency (*All-or-Nothing*, *Should Statements*).
+  - **Internal Agency Score** (0–100): Proportion of high-agency action steps vs. fatalistic framing (*Fortune Telling*, *Learned Helplessness*).
+  - **Emotional Resilience Score** (0–100): Recovery velocity across negative-to-empowered mood states.
+* **Distortion Recurrence Clustering**: Track week-over-week reduction rate (`Δ%`) per distortion type (e.g., Catastrophizing, Sunk Cost Fallacy, Imposter Phenomenon).
+
+## 3. Server-Side Multi-Entry Longitudinal Audit Endpoint (`/api/analytics/longitudinal-audit`)
+* **Authentication Enforcement**: Verify user authentication token (`request.auth != null`).
+* **Resilient Prompt Architecture**: Sanitize all entry snippets against indirect prompt injection before batch reasoning.
+* **Standardized JSON Schema**:
+  ```json
+  {
+    "timeRangeAnalyzed": "Last 30 Days",
+    "entriesCount": 12,
+    "growthSummary": "2-3 sentence overview of psychological trajectory...",
+    "keyBreakthroughMilestones": ["Overcame all-or-nothing thinking in product launches..."],
+    "topRecurringBlindSpots": [
+      {
+        "distortionName": "Catastrophizing",
+        "occurrenceCount": 5,
+        "primaryTrigger": "High-stakes deliverables",
+        "shiftObserved": "Decreased by 35% over last 2 weeks",
+        "recommendedMicroPractice": "5-minute probability reality-check"
+      }
+    ],
+    "vitalityTrends": {
+      "flexibilityDelta": "+18%",
+      "agencyDelta": "+24%",
+      "resilienceDelta": "+12%"
+    },
+    "customBehavioralExperiment": {
+      "title": "The Imperfect Launch Challenge",
+      "hypothesis": "Shipping a 90% draft will generate constructive feedback without catastrophe.",
+      "actionSteps": ["Share draft early", "Log emotional reaction", "Review actual outcome"]
+    }
+  }
+  ```
+
+## 4. Zero-Crash & Sparse Data Fallback Hygiene
+* If a user has fewer than 2 completed reflection entries, the analytics dashboard must render an accessible, non-blocking empty state with proactive guidance rather than failing or rendering broken charts.
+
+

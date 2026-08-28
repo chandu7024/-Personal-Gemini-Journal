@@ -78,40 +78,90 @@ ReflectAI is engineered following the **5 Threat Zones** and the **OWASP Top 10 
 > ⚠️ SECURITY: Never commit `.env`, API keys, service-account JSON files, access tokens, webhook URLs, or other credentials to GitHub. The `.env` file is for local development only. Production Cloud Run deployments retrieve sensitive credentials through Google Cloud Secret Manager.
 ---
 
-## 🔒 Cloud Firestore Security Rules
+## 🔒 Cloud Firestore Security Rules & RBAC
 
-Deploy the following rules in `firestore.rules` to enforce data isolation and RBAC:
+Deploy the following rules in `firestore.rules` to enforce strict tenant isolation, role immutability, and server-side audit logs:
 
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // RBAC Helper: Dynamic document lookup
-    function isAdmin() {
-      return request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
+
+    // Default-deny all unspecified routes
+    match /{document=**} {
+      allow read, write: if false;
     }
 
-    // User Profile Document & Private Settings
+    // Helper: Check if caller is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: Check if caller is verified Super Admin
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == "chandu7024@gmail.com" && request.auth.token.email_verified == true) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin')
+      );
+    }
+
+    // Helper: Check if caller has administrative privileges (admin or super_admin)
+    function isAdmin() {
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'])
+      );
+    }
+
+    // User profiles & RBAC
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // Personal Journal Entries Collection (Owner-Isolated)
+      // Users can read their own profile; Admins can view all profiles
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      // Create: Users register with default 'user' role. SuperAdmin can initialize administrative profiles.
+      // Normal users CANNOT self-assign 'admin' or 'super_admin' roles.
+      allow create: if isSignedIn() && (
+        isSuperAdmin() ||
+        (request.auth.uid == userId && (
+          !('role' in request.resource.data) || 
+          request.resource.data.role == 'user' ||
+          (request.auth.token.email == "chandu7024@gmail.com" && request.auth.token.email_verified == true)
+        ))
+      );
+
+      // Update: SuperAdmin can modify all fields including roles.
+      // Normal users can update profile info (displayName, lastLogin, reminders) ONLY IF 'role' remains unchanged.
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        (request.auth.uid == userId && (
+          !('role' in request.resource.data) || 
+          request.resource.data.role == resource.data.role ||
+          (request.auth.token.email == "chandu7024@gmail.com" && request.auth.token.email_verified == true)
+        ))
+      );
+
+      // Deletion strictly limited to SuperAdmin
+      allow delete: if isSuperAdmin();
+
+      // Personal journal entries collection: Strictly owner-isolated
       match /entries/{entryId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-        
-        // Multi-Turn Spoken / Text Messages Subcollection
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+
+        // Multi-turn reflective messages subcollection
         match /messages/{messageId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read, write: if isSignedIn() && request.auth.uid == userId;
         }
       }
     }
 
-    // System Telemetry & Audit Logs (Admin-Only Access)
+    // System security audit logs:
+    // Read: Allowed only for verified Admins and Super Admins
+    // Write/Update/Delete: DENIED to all direct client writes (immutable server-side dispatch only)
     match /audit_logs/{logId} {
       allow read: if isAdmin();
-      allow write: if request.auth != null;
+      allow write: if false;
     }
   }
 }
@@ -288,8 +338,10 @@ git push -u origin main --force
 | **TC-09** | **Maps Grounding** | Click **"+ Location"** inside an active entry workspace. | Opens the Google Maps Sanctuary Picker. Selecting a location pins coordinates and formatted address to the journal document. |
 | **TC-10** | **External Notification** | Click **"Share / Notify"** & dispatch an Email / Slack summary. | Calls secure `/api/notifications/*` proxy; formats BlockKit / Embeds; logs immutable event to `/audit_logs`. |
 | **TC-11** | **User Data Isolation** | Sign in with User A, create entries, sign out, and sign in with User B. | User B sees zero entries from User A. Firestore rules reject cross-tenant subcollection queries (`request.auth.uid == userId`). |
-| **TC-12** | **Admin Security Console** | Promote account to `admin` and open **"Admin Console"**. | Displays real-time system latency, Gemini API health, error telemetry, and security audit logs. |
+| **TC-12** | **Admin Security Console** | Promote account to `admin` and open **"Admin Console"**. | Displays real-time system latency, Gemini API health, error telemetry, and real-time security audit logs. |
 | **TC-13** | **Threat Model Viewer** | Click **"Threat Model"** in the top navbar. | Opens interactive modal detailing active countermeasures against OWASP Top 10 for LLM Applications. |
+| **TC-14** | **Audit Log Lockdown (Direct Write Prevention)** | Attempt direct client-side write to `/audit_logs/{id}` via Firestore SDK. | Rejected with `PERMISSION_DENIED`. Writes are exclusively handled by trusted server proxy (`/api/audit/log`). |
+| **TC-15** | **RBAC Privilege Escalation Guard** | Standard authenticated user attempts `updateDoc(users/{uid}, { role: "admin" })`. | Rejected with `PERMISSION_DENIED`. Firestore rules block non-super_admin clients from mutating the `role` field. |
 
 ---
 

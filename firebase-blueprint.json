@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Registered user profile with RBAC role information and reminder preferences",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 150 },
+        "email": { "type": "string", "format": "email", "maxLength": 200 },
+        "photoURL": { "type": "string", "maxLength": 1000 },
+        "role": { "type": "string", "enum": ["user", "admin", "super_admin"] },
+        "lastLogin": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "role"]
+    },
+    "JournalEntry": {
+      "title": "Journal Reflection Entry",
+      "description": "User-authored journal and reflective session entry",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 250 },
+        "snippet": { "type": "string", "maxLength": 1000 },
+        "mode": { "type": "string", "enum": ["socratic", "brainstorm", "gratitude", "executive", "mindful"] },
+        "tags": { "type": "array" },
+        "mood": { "type": "string", "maxLength": 50 },
+        "messageCount": { "type": "number" },
+        "pinned": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "title"]
+    },
+    "JournalMessage": {
+      "title": "Journal Turn Message",
+      "description": "A single conversational turn message within a reflection entry",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "content": { "type": "string", "maxLength": 20000 },
+        "timestamp": { "type": "string" },
+        "modelUsed": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["role", "content"]
+    },
+    "SystemAuditLog": {
+      "title": "System Audit Log",
+      "description": "Immutable security and administrative action audit record",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "maxLength": 100 },
+        "actorEmail": { "type": "string", "maxLength": 200 },
+        "actorUid": { "type": "string", "maxLength": 128 },
+        "targetResource": { "type": "string", "maxLength": 200 },
+        "status": { "type": "string", "enum": ["success", "warning", "failure"] },
+        "details": { "type": "string", "maxLength": 2000 },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["action", "status", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles with strict RBAC guards"
+    },
+    "/users/{userId}/entries/{entryId}": {
+      "schema": "JournalEntry",
+      "description": "User journal entries isolated to the authenticated owner"
+    },
+    "/users/{userId}/entries/{entryId}/messages/{messageId}": {
+      "schema": "JournalMessage",
+      "description": "Messages within a reflective journal entry"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "SystemAuditLog",
+      "description": "System security audit trail, readable by admins and protected against direct client modification"
+    }
+  }
+}

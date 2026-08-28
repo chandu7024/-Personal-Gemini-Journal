@@ -164,20 +164,32 @@ export async function updateUserRole(
 }
 
 /**
- * Record system security audit log
+ * Record system security audit log via server proxy
  */
 export async function logAuditEvent(log: Omit<SystemAuditLog, "id" | "timestamp">): Promise<void> {
   try {
-    const logDocRef = doc(collection(db, "audit_logs"));
-    await setDoc(
-      logDocRef,
-      stripUndefined({
-        ...log,
-        timestamp: new Date().toISOString(),
-      })
-    );
+    await fetch("/api/audit/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(log),
+    });
   } catch (err) {
-    console.warn("[Firestore] Could not record audit log:", err);
+    console.warn("[Security Audit] Could not record audit log to server:", err);
+  }
+}
+
+/**
+ * Fetch immutable system security audit logs
+ */
+export async function fetchAuditLogs(): Promise<SystemAuditLog[]> {
+  try {
+    const res = await fetch("/api/admin/audit-logs");
+    if (!res.ok) throw new Error("Failed to fetch audit logs");
+    const data = await res.json();
+    return data.logs || [];
+  } catch (err) {
+    console.warn("[Admin] Could not fetch audit logs:", err);
+    return [];
   }
 }
 

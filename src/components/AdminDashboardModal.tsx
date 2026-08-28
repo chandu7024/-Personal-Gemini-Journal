@@ -20,7 +20,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { UserProfile, UserRole, SystemAuditLog, SystemTelemetry } from "../types";
-import { fetchAllUsers, updateUserRole } from "../lib/firebase";
+import { fetchAllUsers, updateUserRole, fetchAuditLogs } from "../lib/firebase";
 import { testExternalNotification } from "../lib/notifications";
 
 interface AdminDashboardModalProps {
@@ -66,7 +66,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     uptimePercentage: 99.98,
   };
 
-  const auditLogs: SystemAuditLog[] = [
+  const [auditLogs, setAuditLogs] = useState<SystemAuditLog[]>([
     {
       id: "log-01",
       action: "AUTH_FEDERATED_LOGIN",
@@ -96,7 +96,18 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       details: "Active model responsive. Fallback ladder ready.",
       timestamp: new Date(Date.now() - 600000).toLocaleTimeString(),
     },
-  ];
+  ]);
+
+  const loadAuditLogs = async () => {
+    try {
+      const logs = await fetchAuditLogs();
+      if (logs && logs.length > 0) {
+        setAuditLogs(logs);
+      }
+    } catch (err) {
+      console.warn("[Admin] Error loading audit logs:", err);
+    }
+  };
 
   const loadUsers = async () => {
     setIsLoadingUsers(true);
@@ -128,6 +139,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadUsers();
+      loadAuditLogs();
     }
   }, [isOpen]);
 

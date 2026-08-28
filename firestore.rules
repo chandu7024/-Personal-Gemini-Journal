@@ -1,35 +1,83 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // RBAC Helper: Check if requesting user has elevated administrative role
+
+    // Default-deny all unspecified routes
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper: Check if caller is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: Check if caller is verified Super Admin (System Operator or explicit super_admin role)
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == "chandu7024@gmail.com" && request.auth.token.email_verified == true) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin')
+      );
+    }
+
+    // Helper: Check if caller has administrative privileges (admin or super_admin)
     function isAdmin() {
-      return request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'])
+      );
     }
 
     // User profiles & RBAC
     match /users/{userId} {
-      // Users can read/write their own profile; Admins can read all profiles and update roles
-      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      
-      // Personal journal entries collection: Strictly isolated to the owner
+      // Users can read their own profile; Admins can view all profiles
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      // Create: Users can register their profile with default 'user' role.
+      // Verified system operator or SuperAdmin can initialize administrative profiles.
+      // Normal users CANNOT self-assign 'admin' or 'super_admin' roles.
+      allow create: if isSignedIn() && (
+        isSuperAdmin() ||
+        (request.auth.uid == userId && (
+          !('role' in request.resource.data) || 
+          request.resource.data.role == 'user' ||
+          (request.auth.token.email == "chandu7024@gmail.com" && request.auth.token.email_verified == true)
+        ))
+      );
+
+      // Update: SuperAdmin can modify all fields including roles.
+      // Normal users can update profile info (displayName, lastLogin, reminders) ONLY IF 'role' remains unchanged.
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        (request.auth.uid == userId && (
+          !('role' in request.resource.data) || 
+          request.resource.data.role == resource.data.role ||
+          (request.auth.token.email == "chandu7024@gmail.com" && request.auth.token.email_verified == true)
+        ))
+      );
+
+      // Deletion strictly limited to SuperAdmin
+      allow delete: if isSuperAdmin();
+
+      // Personal journal entries collection: Strictly owner-isolated
       match /entries/{entryId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-        
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+
         // Multi-turn reflective messages subcollection
         match /messages/{messageId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read, write: if isSignedIn() && request.auth.uid == userId;
         }
       }
     }
 
-    // System security audit logs: Write by authenticated actors, read restricted to admins
+    // System security audit logs:
+    // Read: Allowed only for verified Admins and Super Admins
+    // Write/Update/Delete: DENIED to all direct client writes (immutable server-side dispatch only)
     match /audit_logs/{logId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if isAdmin();
+      allow read: if isAdmin();
+      allow write: if false;
     }
   }
 }
-

@@ -1,5 +1,41 @@
 export type ReflectionMode = "mindful" | "socratic" | "brainstorm" | "gratitude" | "executive";
 
+export interface CognitiveBiasItem {
+  id: string;
+  name: string;
+  category: "Distortion" | "Fallacy" | "Limiting Belief" | "Emotional Filter";
+  confidence: "High" | "Moderate" | "Subtle";
+  triggerQuote: string;
+  underlyingAssumption: string;
+  clinicalContext: string;
+  socraticReframe: string;
+  actionableChallenge: string;
+}
+
+export interface CognitiveAnalysisResult {
+  flexibilityScore: number; // 0 - 100
+  agencyScore: number; // 0 - 100
+  emotionalResilienceScore: number; // 0 - 100
+  dominantThoughtPattern: string;
+  biasesDetected: CognitiveBiasItem[];
+  overallCognitiveAssessment: string;
+  recommendedReframingTechnique: string;
+  analyzedAt: string;
+  modelUsed?: string;
+}
+
+export interface InstantReframeResult {
+  originalThought: string;
+  detectedDistortions: string[];
+  cognitiveTrap: string;
+  reframes: {
+    pragmatic: string;
+    compassionate: string;
+    highAgency: string;
+  };
+  realityTestingQuestion: string;
+}
+
 export interface JournalSummary {
   title: string;
   executiveSummary: string;
@@ -39,6 +75,7 @@ export interface JournalEntry {
   updatedAt: string;
   messageCount: number;
   summary?: JournalSummary | null;
+  cognitiveAnalysis?: CognitiveAnalysisResult | null;
   pinned?: boolean;
   location?: EntryLocation | null;
 }

@@ -219,6 +219,17 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {entry.cognitiveAnalysis && entry.cognitiveAnalysis.biasesDetected.length > 0 && (
+              <button
+                onClick={onToggleInsights}
+                className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 transition-all cursor-pointer shadow-2xs"
+                title="View Cognitive Distortion Analysis"
+              >
+                <Brain className="w-3.5 h-3.5 text-rose-500" />
+                <span>{entry.cognitiveAnalysis.biasesDetected.length} Biases Flagged</span>
+              </button>
+            )}
+
             <button
               id="btn-toggle-insights-panel"
               onClick={onToggleInsights}
@@ -228,8 +239,8 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
                   : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>Insights & Synthesis</span>
+              <Brain className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>Cognitive Radar & Synthesis</span>
               {isInsightsOpen ? (
                 <PanelRightClose className="w-3.5 h-3.5 ml-0.5" />
               ) : (

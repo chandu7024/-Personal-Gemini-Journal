@@ -15,8 +15,9 @@ import {
   deleteJournalEntry,
   saveJournalMessage,
   saveEntrySummary,
+  saveEntryCognitiveAnalysis,
 } from "../lib/firebase";
-import { sendChatMessage, summarizeJournalEntry } from "../lib/geminiApi";
+import { sendChatMessage, summarizeJournalEntry, analyzeCognitiveBiases } from "../lib/geminiApi";
 import type { JournalEntry, JournalMessage, ReflectionMode, EntryLocation, UserRole } from "../types";
 import { Loader2, Plus, Sparkles, BookOpen } from "lucide-react";
 
@@ -34,6 +35,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const [isEntriesLoading, setIsEntriesLoading] = useState(true);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [isAnalyzingCognition, setIsAnalyzingCognition] = useState(false);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
@@ -299,6 +301,39 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     }
   };
 
+  // Handler: Trigger Deep Cognitive Bias Diagnosis
+  const handleAnalyzeCognitiveBiases = async () => {
+    if (!activeEntryId || !activeEntry || messages.length === 0) return;
+
+    setIsAnalyzingCognition(true);
+    setIsInsightsOpen(true);
+
+    try {
+      const response = await analyzeCognitiveBiases({
+        messages,
+        title: activeEntry.title,
+      });
+
+      if (response.success && response.analysis) {
+        await saveEntryCognitiveAnalysis(user.uid, activeEntryId, response.analysis);
+      }
+    } catch (error) {
+      console.error("Failed to analyze cognitive distortions:", error);
+    } finally {
+      setIsAnalyzingCognition(false);
+    }
+  };
+
+  // Handler: Apply Socratic Reframe back into the active dialogue
+  const handleApplyReframeToChat = async (reframeText: string) => {
+    if (!activeEntryId || !activeEntry) return;
+    try {
+      await handleSendMessage(reframeText);
+    } catch (err) {
+      console.error("Failed to inject reframe to journal chat:", err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100/75 dark:bg-[#0b0f17] flex flex-col antialiased">
       {/* Top Navigation */}
@@ -372,7 +407,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           />
         ) : null}
 
-        {/* Right Drawer: AI Insights & Synthesis */}
+        {/* Right Drawer: AI Insights, Synthesis & Cognitive Bias Radar */}
         {activeEntry && (
           <InsightsDrawer
             summary={activeEntry.summary || null}
@@ -382,6 +417,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
             onSynthesize={handleSynthesize}
             isOpen={isInsightsOpen}
             onClose={() => setIsInsightsOpen(false)}
+            cognitiveAnalysis={activeEntry.cognitiveAnalysis || null}
+            isAnalyzingCognition={isAnalyzingCognition}
+            onAnalyzeCognition={handleAnalyzeCognitiveBiases}
+            messages={messages}
+            onApplyReframeToChat={handleApplyReframeToChat}
           />
         )}
       </div>

@@ -1,4 +1,4 @@
-import type { JournalMessage, JournalSummary, ReflectionMode } from "../types";
+import type { JournalMessage, JournalSummary, ReflectionMode, CognitiveAnalysisResult, InstantReframeResult } from "../types";
 import { sanitizeInput } from "./sanitizer";
 
 export interface ChatResponse {
@@ -11,6 +11,20 @@ export interface ChatResponse {
 export interface SummarizeResponse {
   success: boolean;
   summary: JournalSummary;
+  modelUsed?: string;
+  error?: string;
+}
+
+export interface CognitiveAnalysisResponse {
+  success: boolean;
+  analysis: CognitiveAnalysisResult;
+  modelUsed?: string;
+  error?: string;
+}
+
+export interface InstantReframeResponse {
+  success: boolean;
+  data: InstantReframeResult;
   modelUsed?: string;
   error?: string;
 }
@@ -70,6 +84,63 @@ export async function summarizeJournalEntry(params: {
     body: JSON.stringify({
       messages: sanitizedMessages,
       title: params.title,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Server responded with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Request deep Cognitive Distortion, Bias, and Blind-Spot Diagnosis
+ */
+export async function analyzeCognitiveBiases(params: {
+  messages?: JournalMessage[];
+  text?: string;
+  title?: string;
+}): Promise<CognitiveAnalysisResponse> {
+  const sanitizedMessages = params.messages?.map((m) => ({
+    role: m.role,
+    content: sanitizeInput(m.content),
+  }));
+
+  const response = await fetch("/api/cognitive-analysis", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messages: sanitizedMessages,
+      text: params.text ? sanitizeInput(params.text) : undefined,
+      title: params.title ? sanitizeInput(params.title) : undefined,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Server responded with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Request instant Cognitive Behavioral reframe for a single thought
+ */
+export async function reframeSingleThought(thoughtText: string): Promise<InstantReframeResponse> {
+  const sanitizedText = sanitizeInput(thoughtText);
+
+  const response = await fetch("/api/cognitive-analysis/reframe-thought", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      thoughtText: sanitizedText,
     }),
   });
 

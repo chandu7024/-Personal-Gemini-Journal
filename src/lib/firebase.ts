@@ -22,7 +22,7 @@ import {
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 import { stripUndefined } from "./sanitizer";
-import type { JournalEntry, JournalMessage, JournalSummary, ReflectionMode, UserProfile, UserRole, SystemAuditLog } from "../types";
+import type { JournalEntry, JournalMessage, JournalSummary, CognitiveAnalysisResult, ReflectionMode, UserProfile, UserRole, SystemAuditLog } from "../types";
 
 // Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -222,6 +222,7 @@ export function subscribeToUserEntries(
           updatedAt: data.updatedAt ? (typeof data.updatedAt.toDate === "function" ? data.updatedAt.toDate().toISOString() : data.updatedAt) : new Date().toISOString(),
           messageCount: data.messageCount || 0,
           summary: data.summary || null,
+          cognitiveAnalysis: data.cognitiveAnalysis || null,
           pinned: Boolean(data.pinned),
           location: data.location || null,
         });
@@ -390,3 +391,22 @@ export async function saveEntrySummary(
     })
   );
 }
+
+/**
+ * Save Cognitive Distortion & Bias Analysis to Firestore
+ */
+export async function saveEntryCognitiveAnalysis(
+  userId: string,
+  entryId: string,
+  cognitiveAnalysis: CognitiveAnalysisResult
+): Promise<void> {
+  const entryDocRef = doc(db, "users", userId, "entries", entryId);
+  await updateDoc(
+    entryDocRef,
+    stripUndefined({
+      cognitiveAnalysis,
+      updatedAt: serverTimestamp(),
+    })
+  );
+}
+

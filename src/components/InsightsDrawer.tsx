@@ -18,9 +18,13 @@ import {
   ExternalLink,
   ShieldCheck,
   Eye,
+  Brain,
+  ShieldAlert,
+  Zap,
 } from "lucide-react";
-import type { JournalSummary, JournalEntry } from "../types";
+import type { JournalSummary, JournalEntry, CognitiveAnalysisResult, JournalMessage } from "../types";
 import { sendEmailNotification } from "../lib/notifications";
+import { CognitiveBiasRadar } from "./CognitiveBiasRadar";
 
 interface InsightsDrawerProps {
   summary: JournalSummary | null;
@@ -30,6 +34,11 @@ interface InsightsDrawerProps {
   onSynthesize: () => void;
   isOpen: boolean;
   onClose: () => void;
+  cognitiveAnalysis: CognitiveAnalysisResult | null;
+  isAnalyzingCognition: boolean;
+  onAnalyzeCognition: () => void;
+  messages: JournalMessage[];
+  onApplyReframeToChat?: (reframeText: string) => void;
 }
 
 export const InsightsDrawer: React.FC<InsightsDrawerProps> = ({
@@ -40,10 +49,16 @@ export const InsightsDrawer: React.FC<InsightsDrawerProps> = ({
   onSynthesize,
   isOpen,
   onClose,
+  cognitiveAnalysis,
+  isAnalyzingCognition,
+  onAnalyzeCognition,
+  messages,
+  onApplyReframeToChat,
 }) => {
+  const [activeTab, setActiveTab] = useState<"summary" | "radar" | "email">("summary");
   const [copied, setCopied] = useState(false);
   const [completedActions, setCompletedActions] = useState<Record<number, boolean>>({});
-  
+
   // Email Notification States
   const [recipientEmail, setRecipientEmail] = useState(userEmail || "chandu7024@gmail.com");
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -140,189 +155,305 @@ ${summary.suggestedTopics.map((t) => `- ${t}`).join("\n")}
     }
   };
 
+  const biasesCount = cognitiveAnalysis?.biasesDetected?.length || 0;
 
   return (
     <aside
       id="insights-drawer"
-      className="w-full sm:w-88 md:w-96 border-l border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md flex flex-col h-[calc(100vh-4rem)] shrink-0 z-20 overflow-hidden shadow-2xs"
+      className="w-full sm:w-88 md:w-[420px] border-l border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md flex flex-col h-[calc(100vh-4rem)] shrink-0 z-20 overflow-hidden shadow-2xs"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-slate-200/70 dark:border-slate-800">
+      {/* Top Header */}
+      <div className="p-3.5 border-b border-slate-200/70 dark:border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60 shadow-2xs">
-            <Sparkles className="w-4 h-4" />
+            <Brain className="w-4 h-4" />
           </div>
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              Synthesis & Insights
+              Cognitive Depth & Synthesis
             </h3>
-            <span className="text-[10px] text-slate-400 font-medium">Gemini 3.6 Flash Cognitive Engine</span>
+            <span className="text-[10px] text-slate-400 font-medium">Gemini 3.6 Flash & Cognitive CBT</span>
           </div>
         </div>
 
         <div className="flex items-center gap-1">
           <button
             id="btn-re-synthesize"
-            onClick={onSynthesize}
-            disabled={isLoading}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
-            title="Re-synthesize Reflection"
+            onClick={activeTab === "radar" ? onAnalyzeCognition : onSynthesize}
+            disabled={isLoading || isAnalyzingCognition}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 cursor-pointer"
+            title={activeTab === "radar" ? "Re-Scan Biases" : "Re-synthesize Reflection"}
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-indigo-600" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${isLoading || isAnalyzingCognition ? "animate-spin text-indigo-600" : ""}`} />
           </button>
           <button
             id="btn-close-insights"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
-        {isLoading ? (
-          <div className="py-16 text-center space-y-3">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
-            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Gemini is synthesizing your journal reflection...
-            </p>
-            <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-              Extracting core themes, cognitive patterns, emotional tone, and actionable steps.
-            </p>
-          </div>
-        ) : !summary ? (
-          <div className="py-12 text-center space-y-3">
-            <FileText className="w-10 h-10 text-slate-300 dark:text-slate-700 mx-auto" />
-            <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              No Synthesis Generated Yet
-            </h4>
-            <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-              Click below to let Gemini analyze your reflections and generate an executive summary with action items.
-            </p>
-            <button
-              id="btn-generate-synthesis-first"
-              onClick={onSynthesize}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs transition-colors cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Generate AI Synthesis</span>
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* Title & Mood */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                  Synthesized Title
-                </span>
-                {summary.mood && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-                    <Smile className="w-3 h-3" />
-                    {summary.mood}
-                  </span>
-                )}
-              </div>
-              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                {summary.title}
-              </h4>
-            </div>
+      {/* Segmented Tab Navigation */}
+      <div className="px-3.5 pt-3 pb-1 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30">
+        <div className="flex items-center p-1 rounded-xl bg-slate-200/70 dark:bg-slate-800/90 text-xs font-semibold">
+          <button
+            onClick={() => setActiveTab("summary")}
+            className={`flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === "summary"
+                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Summary</span>
+          </button>
 
-            {/* Executive Summary */}
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
-                <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Executive Summary
+          <button
+            onClick={() => setActiveTab("radar")}
+            className={`flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center gap-1.5 relative ${
+              activeTab === "radar"
+                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+            }`}
+          >
+            <Brain className="w-3.5 h-3.5" />
+            <span>Bias Radar</span>
+            {biasesCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-500 text-white font-bold">
+                {biasesCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("email")}
+            className={`flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === "email"
+                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+            }`}
+          >
+            <Mail className="w-3.5 h-3.5" />
+            <span>Email</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Drawer Scrollable View */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* TAB 1: EXECUTIVE SUMMARY */}
+        {activeTab === "summary" && (
+          <div className="space-y-4">
+            {isLoading ? (
+              <div className="py-16 text-center space-y-3">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Gemini is synthesizing your journal reflection...
+                </p>
+                <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                  Extracting core themes, cognitive patterns, emotional tone, and actionable steps.
+                </p>
+              </div>
+            ) : !summary ? (
+              <div className="py-12 text-center space-y-3">
+                <FileText className="w-10 h-10 text-slate-300 dark:text-slate-700 mx-auto" />
+                <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  No Synthesis Generated Yet
+                </h4>
+                <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                  Click below to let Gemini analyze your reflections and generate an executive summary with action items.
+                </p>
+                <button
+                  id="btn-generate-synthesis-first"
+                  onClick={onSynthesize}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs transition-colors cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Generate AI Synthesis</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Title & Mood */}
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Synthesized Title
+                    </span>
+                    {summary.mood && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                        <Smile className="w-3 h-3" />
+                        {summary.mood}
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                    {summary.title}
+                  </h4>
+                </div>
+
+                {/* Executive Summary */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
+                    <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Executive Summary
+                    </h4>
+                  </div>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-indigo-50/30 dark:bg-indigo-950/20 p-3 rounded-xl border border-indigo-100/60 dark:border-indigo-900/30">
+                    {summary.executiveSummary}
+                  </p>
+                </div>
+
+                {/* Key Insights */}
+                {summary.keyInsights && summary.keyInsights.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
+                      <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Key Insights & Themes
+                      </h4>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {summary.keyInsights.map((insight, idx) => (
+                        <li
+                          key={idx}
+                          className="text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-800/50"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1.5" />
+                          <span>{insight}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Action Items */}
+                {summary.actionItems && summary.actionItems.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
+                      <ListTodo className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Actionable Next Steps
+                      </h4>
+                    </div>
+                    <div className="space-y-1.5">
+                      {summary.actionItems.map((action, idx) => {
+                        const isDone = !!completedActions[idx];
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => toggleAction(idx)}
+                            className={`w-full text-left text-xs flex items-start gap-2.5 p-2 rounded-lg border transition-all cursor-pointer ${
+                              isDone
+                                ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40 text-slate-400 line-through"
+                                : "bg-slate-50 dark:bg-slate-800/30 border-slate-200/50 dark:border-slate-800/50 text-slate-700 dark:text-slate-300 hover:border-slate-300"
+                            }`}
+                          >
+                            {isDone ? (
+                              <CheckSquare className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                            ) : (
+                              <Square className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                            )}
+                            <span className="flex-1 leading-snug">{action}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Suggested Exploration Topics */}
+                {summary.suggestedTopics && summary.suggestedTopics.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
+                      <Compass className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Future Exploration Prompts
+                      </h4>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {summary.suggestedTopics.map((topic, idx) => (
+                        <span
+                          key={idx}
+                          className="text-[11px] px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/40"
+                        >
+                          {topic}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: COGNITIVE BLIND-SPOT RADAR */}
+        {activeTab === "radar" && (
+          <CognitiveBiasRadar
+            analysis={cognitiveAnalysis}
+            entry={entry}
+            messages={messages}
+            isLoading={isAnalyzingCognition}
+            onAnalyze={onAnalyzeCognition}
+            onApplyReframeToChat={onApplyReframeToChat}
+          />
+        )}
+
+        {/* TAB 3: EMAIL & EXPORT */}
+        {activeTab === "email" && (
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-3">
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                  Email Executive Summary
                 </h4>
               </div>
-              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-indigo-50/30 dark:bg-indigo-950/20 p-3 rounded-xl border border-indigo-100/60 dark:border-indigo-900/30">
-                {summary.executiveSummary}
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                Sends a formatted, responsive executive email digest of this reflection to your inbox.
               </p>
+
+              <form onSubmit={handleSendEmail} className="space-y-2.5">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                    Recipient Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={recipientEmail}
+                    onChange={(e) => setRecipientEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSendingEmail || !summary}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-2xs transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Sending Email...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Send Digest to {recipientEmail.split("@")[0] || "Me"}</span>
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
 
-            {/* Key Insights */}
-            {summary.keyInsights && summary.keyInsights.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
-                  <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Key Insights & Themes
-                  </h4>
-                </div>
-                <ul className="space-y-1.5">
-                  {summary.keyInsights.map((insight, idx) => (
-                    <li
-                      key={idx}
-                      className="text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-800/50"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1.5" />
-                      <span>{insight}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Action Items */}
-            {summary.actionItems && summary.actionItems.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
-                  <ListTodo className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Actionable Next Steps
-                  </h4>
-                </div>
-                <div className="space-y-1.5">
-                  {summary.actionItems.map((action, idx) => {
-                    const isDone = !!completedActions[idx];
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => toggleAction(idx)}
-                        className={`w-full text-left text-xs flex items-start gap-2.5 p-2 rounded-lg border transition-all cursor-pointer ${
-                          isDone
-                            ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40 text-slate-400 line-through"
-                            : "bg-slate-50 dark:bg-slate-800/30 border-slate-200/50 dark:border-slate-800/50 text-slate-700 dark:text-slate-300 hover:border-slate-300"
-                        }`}
-                      >
-                        {isDone ? (
-                          <CheckSquare className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                        ) : (
-                          <Square className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                        )}
-                        <span className="flex-1 leading-snug">{action}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Suggested Exploration Topics */}
-            {summary.suggestedTopics && summary.suggestedTopics.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
-                  <Compass className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Future Exploration Prompts
-                  </h4>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {summary.suggestedTopics.map((topic, idx) => (
-                    <span
-                      key={idx}
-                      className="text-[11px] px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/40"
-                    >
-                      {topic}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Email Dispatch Status Banner */}
+            {/* Email Status Feedback */}
             {emailStatus && (
               <div
                 className={`p-3.5 rounded-xl text-xs flex items-start gap-2.5 ${
@@ -348,11 +479,11 @@ ${summary.suggestedTopics.map((t) => `- ${t}`).join("\n")}
                         : "Dispatch Failed"}
                     </p>
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
-                      {emailStatus.mode === "live_smtp_delivered" ? "Live SMTP" : "Preview / Mailto Ready"}
+                      {emailStatus.mode === "live_smtp_delivered" ? "Live SMTP" : "Mailto / Web Ready"}
                     </span>
                   </div>
                   <p className="text-[11px] leading-relaxed opacity-90">{emailStatus.message}</p>
-                  
+
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     {emailStatus.gmailWebUrl && (
                       <a
@@ -386,12 +517,41 @@ ${summary.suggestedTopics.map((t) => `- ${t}`).join("\n")}
                 </div>
               </div>
             )}
-          </>
+
+            {/* Markdown Export Option */}
+            <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Export to Markdown / Clipboard
+                </span>
+                <button
+                  onClick={handleCopyMarkdown}
+                  disabled={!summary}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy MD</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Copies the entire structured reflection summary, key themes, and action checklist to paste into Obsidian, Notion, or Slack.
+              </p>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Footer Action buttons */}
-      {summary && (
+      {/* Footer Summary Quick Action Bar */}
+      {summary && activeTab === "summary" && (
         <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -414,31 +574,31 @@ ${summary.suggestedTopics.map((t) => `- ${t}`).join("\n")}
 
             <button
               id="btn-email-synthesis"
-              onClick={() => setShowEmailModal(true)}
+              onClick={() => setActiveTab("email")}
               className="flex items-center justify-center gap-1.5 py-2 px-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-2xs transition-colors cursor-pointer"
             >
               <Mail className="w-3.5 h-3.5" />
-              <span>Email Summary</span>
+              <span>Email Digest</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Email Dispatch & Preview Modal */}
-      {showEmailModal && summary && (
+      {/* HTML Inspection Modal */}
+      {showEmailModal && summary && previewHtml && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
           <div className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
-                  <Mail className="w-4 h-4" />
+                  <Eye className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    Dispatch Reflection Email
+                    Inspecting Email HTML Preview
                   </h3>
                   <span className="text-[10px] text-slate-400">
-                    Notification Directive (OWASP A01 / Server Proximity)
+                    Rendered Template Preview
                   </span>
                 </div>
               </div>
@@ -450,79 +610,22 @@ ${summary.suggestedTopics.map((t) => `- ${t}`).join("\n")}
               </button>
             </div>
 
-            <form onSubmit={handleSendEmail} className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Recipient Email Address
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={recipientEmail}
-                  onChange={(e) => setRecipientEmail(e.target.value)}
-                  placeholder="user@example.com"
-                  className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
+            <div className="flex-1 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl p-2 bg-slate-50 dark:bg-slate-950">
+              <iframe
+                title="Email Preview"
+                srcDoc={previewHtml}
+                className="w-full h-80 border-0 rounded-lg bg-white"
+              />
+            </div>
 
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800 text-xs space-y-1.5">
-                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-[11px]">
-                  <span>Subject</span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">ReflectAI Executive Synthesis</span>
-                </div>
-                <div className="font-bold text-slate-800 dark:text-slate-200 truncate">
-                  {summary.title || "Reflective Journal Entry"}
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">
-                  {summary.executiveSummary}
-                </p>
-              </div>
-
-              {/* Live HTML Preview Accordion / Frame */}
-              {previewHtml && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                    <span>Rendered Email Payload</span>
-                    <span className="text-emerald-600 font-mono text-[10px]">Validated HTML</span>
-                  </div>
-                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-48 overflow-y-auto bg-slate-50 dark:bg-slate-950 p-2">
-                    <iframe
-                      title="Email Preview"
-                      srcDoc={previewHtml}
-                      className="w-full h-40 border-0 rounded bg-white"
-                      sandbox="allow-same-origin"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowEmailModal(false)}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
-                >
-                  Close
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSendingEmail}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {isSendingEmail ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Dispatching...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Send Notification</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setShowEmailModal(false)}
+                className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 cursor-pointer"
+              >
+                Close Preview
+              </button>
+            </div>
           </div>
         </div>
       )}

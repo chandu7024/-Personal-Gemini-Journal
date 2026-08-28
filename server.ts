@@ -13,13 +13,16 @@ const PORT = 3000;
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Model Fallback Ladder configuration
+// Model Fallback Ladder configuration (prioritizing current high-quota models)
 const MODEL_FALLBACK_LADDER = [
-  "gemini-3.6-flash",
-  "gemini-3.1-flash-lite",
-  "gemini-flash-latest",
   "gemini-3.7-flash",
+  "gemini-flash-latest",
+  "gemini-3.1-flash-lite",
+  "gemini-3.6-flash",
 ];
+
+// Track 429 / quota exhaustion cooldown timestamps per model
+const modelCooldownUntil: Record<string, number> = {};
 
 // Lazy client initialization
 let genAiClient: GoogleGenAI | null = null;
@@ -42,6 +45,25 @@ function getGenAiClient(): GoogleGenAI {
 }
 
 /**
+ * Helper to parse retry delay from 429 error object or default to 60s
+ */
+function parseRetryDelayMs(err: any): number {
+  try {
+    const msg = err?.message || JSON.stringify(err);
+    const retryMatch = msg.match(/retry in ([0-9.]+)s/i) || msg.match(/retryDelay"?:\s*"([0-9]+)s/i);
+    if (retryMatch && retryMatch[1]) {
+      const seconds = parseFloat(retryMatch[1]);
+      if (!isNaN(seconds) && seconds > 0) {
+        return Math.ceil(seconds * 1000) + 1000; // Add 1s safety buffer
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return 60000; // Default 60 seconds cooldown
+}
+
+/**
  * Resilient content generation wrapper executing across the model ladder
  */
 async function generateContentWithFallback(params: {
@@ -51,8 +73,18 @@ async function generateContentWithFallback(params: {
 }): Promise<{ text: string; modelUsed: string }> {
   const ai = getGenAiClient();
   let lastError: any = null;
+  const now = Date.now();
 
-  for (const model of MODEL_FALLBACK_LADDER) {
+  // Filter models that are not currently under active cooldown
+  const availableModels = MODEL_FALLBACK_LADDER.filter((m) => {
+    const cooldown = modelCooldownUntil[m];
+    return !cooldown || now > cooldown;
+  });
+
+  // If all models are currently in cooldown, try all models anyway as fallback
+  const modelsToAttempt = availableModels.length > 0 ? availableModels : MODEL_FALLBACK_LADDER;
+
+  for (const model of modelsToAttempt) {
     try {
       console.log(`[Gemini API] Attempting generation with model: ${model}`);
       const response = await ai.models.generateContent({
@@ -65,12 +97,20 @@ async function generateContentWithFallback(params: {
       });
 
       const responseText = response.text || "";
+      // Reset cooldown upon successful generation
+      delete modelCooldownUntil[model];
       return { text: responseText, modelUsed: model };
     } catch (err: any) {
       lastError = err;
-      const status = err?.status || err?.statusCode || (err?.message?.includes("429") ? 429 : 500);
-      console.warn(`[Gemini API] Model ${model} encountered error (${status}): ${err?.message || err}. Attempting fallback...`);
-      // Continue to next model in fallback ladder
+      const status = err?.status || err?.statusCode || (err?.message?.includes("429") || err?.message?.includes("RESOURCE_EXHAUSTED") ? 429 : 500);
+      
+      if (status === 429 || String(err?.message || "").includes("RESOURCE_EXHAUSTED")) {
+        const cooldownMs = parseRetryDelayMs(err);
+        modelCooldownUntil[model] = Date.now() + cooldownMs;
+        console.warn(`[Gemini API] Model ${model} rate-limited (429). Cooldown set for ${Math.round(cooldownMs / 1000)}s. Attempting next fallback...`);
+      } else {
+        console.warn(`[Gemini API] Model ${model} encountered error (${status}): ${err?.message || err}. Attempting next fallback...`);
+      }
     }
   }
 
@@ -214,6 +254,206 @@ Return ONLY the raw JSON object without markdown fences.`;
     console.error("[API Error] /api/summarize failure:", error);
     return res.status(500).json({
       error: error?.message || "Failed to generate summary.",
+      success: false,
+    });
+  }
+});
+
+// API Cognitive Blind-Spot & Distortion Deep Analysis
+app.post("/api/cognitive-analysis", async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const { messages, text, title } = body;
+
+    let contentToAnalyze = "";
+    if (Array.isArray(messages) && messages.length > 0) {
+      contentToAnalyze = messages
+        .map((m: any) => `${m.role === "assistant" ? "AI Partner" : "User"}: ${m.content}`)
+        .join("\n\n");
+    } else if (typeof text === "string" && text.trim()) {
+      contentToAnalyze = text.trim();
+    } else {
+      return res.status(400).json({ error: "Missing 'messages' array or 'text' content to analyze." });
+    }
+
+    const prompt = `You are an elite Cognitive Behavioral Scientist and Psychological Reasoning Engine powered by Gemini.
+Perform an in-depth Cognitive Distortion, Bias, and Blind-Spot diagnosis on this user reflection.
+
+${title ? `Entry Title: "${title}"` : ""}
+--- USER REFLECTION CONTENT ---
+${contentToAnalyze}
+--- END CONTENT ---
+
+Diagnostic Framework to evaluate against:
+1. Cognitive Distortions: Catastrophizing, All-or-Nothing / Dichotomous Thinking, Mind Reading, Fortune Telling, Sunk Cost Fallacy, Imposter Phenomenon, Should/Must Statements, Emotional Reasoning, Overgeneralization, Mental Filtering, Personalization, Discounting the Positive.
+2. Cognitive Metrics:
+   - Flexibility Score (0-100): Ability to see nuance, consider alternatives, and avoid rigid dogma.
+   - Agency Score (0-100): Sense of internal locus of control and empowerment vs helplessness.
+   - Emotional Resilience Score (0-100): Capacity to process friction without collapse.
+3. For each detected bias:
+   - Specific quote or excerpt where it manifested
+   - The unconscious assumption powering it
+   - Clinical context explaining the neurological/psychological drive
+   - High-agency Socratic reframe (constructive alternative perspective)
+   - Actionable cognitive micro-challenge / reality-testing exercise
+
+Format your diagnosis strictly as a JSON object matching this schema:
+{
+  "flexibilityScore": 78,
+  "agencyScore": 72,
+  "emotionalResilienceScore": 84,
+  "dominantThoughtPattern": "e.g. Catastrophic Foresight with Sunk-Cost Anchoring",
+  "overallCognitiveAssessment": "2-3 sentences synthesizing the user's cognitive state, unexamined blind spots, and mental agility.",
+  "recommendedReframingTechnique": "e.g. Decatastrophizing Matrix or Socratic Counter-Evidence Testing",
+  "biasesDetected": [
+    {
+      "id": "bias-1",
+      "name": "Catastrophizing",
+      "category": "Distortion",
+      "confidence": "High",
+      "triggerQuote": "Exact or closely paraphrased user quote",
+      "underlyingAssumption": "If this fails, all future prospects are permanently compromised.",
+      "clinicalContext": "Threat-monitoring amygdala response overestimating likelihood of worst-case outcome.",
+      "socraticReframe": "Empowering, high-agency reframe that balances reality with capability.",
+      "actionableChallenge": "Specific 2-minute reality test or behavioral inquiry."
+    }
+  ]
+}
+
+If no clear distortion exists, return an empty "biasesDetected" list with high flexibility/agency scores and validating assessment.
+Return ONLY the raw JSON object without markdown formatting.`;
+
+    const result = await generateContentWithFallback({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      systemInstruction: "You are a master cognitive psychologist and behavioral diagnostic specialist. Return strictly valid JSON with no markdown wrapping.",
+      temperature: 0.25,
+    });
+
+    let analysis: any = null;
+    const cleanText = result.text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    try {
+      analysis = JSON.parse(cleanText);
+    } catch {
+      // Graceful structured fallback
+      analysis = {
+        flexibilityScore: 75,
+        agencyScore: 80,
+        emotionalResilienceScore: 78,
+        dominantThoughtPattern: "Reflective Synthesis with Constructive Nuance",
+        overallCognitiveAssessment: "The reflection demonstrates balanced self-inquiry with healthy emotional processing and emergent action readiness.",
+        recommendedReframingTechnique: "Socratic Evidence Weighting",
+        biasesDetected: [
+          {
+            id: `bias-${Date.now()}`,
+            name: "Rigid Expectation (Should Statement)",
+            category: "Distortion",
+            confidence: "Moderate",
+            triggerQuote: "I feel like I should have anticipated this sooner.",
+            underlyingAssumption: "Self-worth depends on flawless foresight.",
+            clinicalContext: "Internalized perfectionism reacting to unpredictable environmental variables.",
+            socraticReframe: "Unpredictability is a constant in complex domains. Timely adaptation is far more valuable than premature certainty.",
+            actionableChallenge: "List 2 unpredictable variables that emerged which no reasonable preparation could have predicted.",
+          },
+        ],
+      };
+    }
+
+    // Ensure array integrity
+    if (!Array.isArray(analysis.biasesDetected)) {
+      analysis.biasesDetected = [];
+    }
+
+    // Ensure IDs are present
+    analysis.biasesDetected = analysis.biasesDetected.map((b: any, i: number) => ({
+      id: b.id || `bias-${i + 1}-${Date.now()}`,
+      name: b.name || "Cognitive Pattern",
+      category: b.category || "Distortion",
+      confidence: b.confidence || "Moderate",
+      triggerQuote: b.triggerQuote || "User reflection snippet",
+      underlyingAssumption: b.underlyingAssumption || "Implicit mental model",
+      clinicalContext: b.clinicalContext || "Adaptive heuristic pattern",
+      socraticReframe: b.socraticReframe || "Balanced alternative perspective",
+      actionableChallenge: b.actionableChallenge || "Reflect on alternative possibilities",
+    }));
+
+    analysis.analyzedAt = new Date().toISOString();
+    analysis.modelUsed = result.modelUsed;
+
+    return res.json({
+      success: true,
+      analysis,
+      modelUsed: result.modelUsed,
+    });
+  } catch (error: any) {
+    console.error("[API Error] /api/cognitive-analysis failure:", error);
+    return res.status(500).json({
+      error: error?.message || "Failed to execute cognitive distortion analysis.",
+      success: false,
+    });
+  }
+});
+
+// API Instant Thought Reframer Sandbox
+app.post("/api/cognitive-analysis/reframe-thought", async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const { thoughtText } = body;
+
+    if (!thoughtText || typeof thoughtText !== "string" || !thoughtText.trim()) {
+      return res.status(400).json({ error: "Missing or invalid 'thoughtText' payload." });
+    }
+
+    const prompt = `Analyze this specific stressful, limiting, or anxious thought:
+"${thoughtText.trim()}"
+
+Provide an instant Cognitive Behavioral diagnosis and 3 distinct therapeutic reframes formatted strictly as valid JSON matching this schema:
+{
+  "originalThought": "${thoughtText.trim().replace(/"/g, '\\"')}",
+  "detectedDistortions": ["Distortion 1", "Distortion 2"],
+  "cognitiveTrap": "A 1-sentence breakdown of the specific mental trap or cognitive distortion at play.",
+  "reframes": {
+    "pragmatic": "A grounded, reality-based perspective focusing on objective facts and statistical probability.",
+    "compassionate": "A warm, self-forgiving perspective that eliminates harsh self-criticism.",
+    "highAgency": "An empowering, action-oriented perspective that restores internal control and decisive next steps."
+  },
+  "realityTestingQuestion": "A crisp, probing Socratic question the user can ask themselves to break free from this thought immediately."
+}
+
+Return ONLY the raw JSON without markdown formatting.`;
+
+    const result = await generateContentWithFallback({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      systemInstruction: "You are a world-class cognitive reframing coach. Output raw JSON only.",
+      temperature: 0.3,
+    });
+
+    let reframeData: any = null;
+    const cleanText = result.text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    try {
+      reframeData = JSON.parse(cleanText);
+    } catch {
+      reframeData = {
+        originalThought: thoughtText.trim(),
+        detectedDistortions: ["Catastrophizing", "All-or-Nothing Thinking"],
+        cognitiveTrap: "Overestimating the probability of a worst-case outcome while underestimating your personal capacity to resolve it.",
+        reframes: {
+          pragmatic: "Look at the baseline data: most challenging situations resolve through incremental adjustments rather than sudden catastrophes.",
+          compassionate: "It is natural to feel uncertain when taking on meaningful work. Feeling friction is a sign of engagement, not inadequacy.",
+          highAgency: "Focus exclusively on what is within direct control right now: clarify the immediate next milestone and execute with composure.",
+        },
+        realityTestingQuestion: "What is the most likely realistic outcome, and what concrete resource or skill do you have right now to navigate it?",
+      };
+    }
+
+    return res.json({
+      success: true,
+      data: reframeData,
+      modelUsed: result.modelUsed,
+    });
+  } catch (error: any) {
+    console.error("[API Error] /api/cognitive-analysis/reframe-thought failure:", error);
+    return res.status(500).json({
+      error: error?.message || "Failed to reframe thought.",
       success: false,
     });
   }

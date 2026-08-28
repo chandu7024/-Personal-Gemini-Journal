@@ -12,16 +12,21 @@ import {
   TrendingUp,
   Mic,
   Radio,
+  Compass,
+  Bell,
 } from "lucide-react";
 import type { User } from "firebase/auth";
-import type { UserRole } from "../types";
+import type { UserRole, EmailReminderSettings } from "../types";
 
 interface NavbarProps {
   user: User | null;
   userRole?: UserRole;
+  reminderSettings?: EmailReminderSettings | null;
   onSignOut: () => void;
   onNewEntry: () => void;
   onOpenVoiceJournal?: () => void;
+  onOpenConstellation?: () => void;
+  onOpenReminders?: () => void;
   onOpenThreatModel: () => void;
   onOpenAdminConsole?: () => void;
   onOpenAnalytics?: () => void;
@@ -32,9 +37,12 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   user,
   userRole = "user",
+  reminderSettings,
   onSignOut,
   onNewEntry,
   onOpenVoiceJournal,
+  onOpenConstellation,
+  onOpenReminders,
   onOpenThreatModel,
   onOpenAdminConsole,
   onOpenAnalytics,
@@ -42,6 +50,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleSidebar,
 }) => {
   const isAdmin = userRole === "admin" || userRole === "super_admin";
+  const isReminderActive = reminderSettings?.enabled;
+
   return (
     <header
       id="main-navbar"
@@ -94,6 +104,37 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         )}
 
+        {onOpenConstellation && (
+          <button
+            id="btn-constellation-nav"
+            onClick={onOpenConstellation}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50/90 dark:bg-purple-950/70 hover:bg-purple-100 dark:hover:bg-purple-900/80 border border-purple-200/70 dark:border-purple-800/60 rounded-lg transition-colors cursor-pointer shadow-2xs"
+            title="Open Subconscious Timeline & Constellation Graph"
+          >
+            <Compass className="w-4 h-4 text-purple-600 dark:text-purple-400 animate-spin-slow" />
+            <span className="hidden md:inline">Subconscious Graph</span>
+          </button>
+        )}
+
+        {onOpenReminders && (
+          <button
+            id="btn-reminders-nav"
+            onClick={onOpenReminders}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-medium rounded-lg transition-all cursor-pointer border ${
+              isReminderActive
+                ? "bg-indigo-50/90 hover:bg-indigo-100 dark:bg-indigo-950/70 dark:hover:bg-indigo-900/80 border-indigo-200/70 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-300 shadow-2xs"
+                : "bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-300"
+            }`}
+            title="Configure Daily & Weekly Email Reflection Reminders"
+          >
+            <Bell className={`w-4 h-4 ${isReminderActive ? "text-indigo-600 dark:text-indigo-400 animate-bounce-short" : "text-slate-400"}`} />
+            <span className="hidden md:inline">Reminders</span>
+            {isReminderActive && (
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+            )}
+          </button>
+        )}
+
         <button
           id="btn-new-reflection-nav"
           onClick={onNewEntry}
@@ -102,6 +143,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">New Reflection</span>
         </button>
+
 
         <button
           id="btn-threat-model"
@@ -121,9 +163,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="Open Longitudinal Cognitive Growth & Distortion Radar"
           >
             <Brain className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <span className="hidden md:inline">Cognitive Analytics</span>
+            <span className="hidden md:inline">Analytics</span>
           </button>
         )}
+
 
         {onOpenAdminConsole && (
           <button

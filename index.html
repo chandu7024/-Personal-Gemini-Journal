@@ -3,12 +3,42 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
-    <meta name="description" content="An application built with Google AI Studio." />
-    <meta property="og:title" content="My Google AI Studio App" />
-    <meta property="og:description" content="An application built with Google AI Studio." />
+    <title>ReflectAI - Journal & Reflection Assistant</title>
+    <meta name="description" content="User-authenticated personal journaling, cognitive bias diagnostics, and real-time Socratic voice journaling powered by Gemini and Firestore." />
+    <meta property="og:title" content="ReflectAI - Journal & Reflection Assistant" />
+    <meta property="og:description" content="User-authenticated personal journaling, cognitive bias diagnostics, and real-time Socratic voice journaling powered by Gemini and Firestore." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      // Suppress benign Vite dev server HMR websocket connection warnings and unhandled rejections
+      window.addEventListener('unhandledrejection', function (event) {
+        var reason = event.reason;
+        var msg = (reason && (reason.message || reason.stack || String(reason))) || '';
+        if (
+          msg.includes('WebSocket') ||
+          msg.includes('[vite]') ||
+          msg.includes('failed to connect to websocket') ||
+          msg.includes('closed without opened')
+        ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      });
+
+      window.addEventListener('error', function (event) {
+        var msg = (event && (event.message || (event.error && event.error.message))) || '';
+        if (
+          typeof msg === 'string' &&
+          (msg.includes('WebSocket') ||
+            msg.includes('[vite]') ||
+            msg.includes('failed to connect to websocket') ||
+            msg.includes('closed without opened'))
+        ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

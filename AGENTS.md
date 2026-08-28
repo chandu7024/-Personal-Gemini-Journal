@@ -112,6 +112,17 @@ Notifications should be dispatched or queued when specific journal entry parsing
 ## 3. Server-Side Multi-Entry Longitudinal Audit Endpoint (`/api/analytics/longitudinal-audit`)
 * **Authentication Enforcement**: Verify user authentication token (`request.auth != null`).
 * **Resilient Prompt Architecture**: Sanitize all entry snippets against indirect prompt injection before batch reasoning.
+
+# Subconscious Timeline & Semantic Constellation Directive
+
+## 1. Concept & Multi-Entry Echo Architecture
+* **Subconscious Mapping**: Transform chronological reflections into a multi-dimensional semantic graph connecting core beliefs, recurring psychological triggers, breakthroughs, and emotional filters.
+* **Echo Detection Engine (`/api/analytics/constellation-graph`)**:
+  - The server endpoint parses historical reflections and extracts latent thematic clusters.
+  - Generates cross-entry "Subconscious Echoes" identifying repeating psychological patterns across time and contrasting past fears with observed outcomes.
+* **Zero-Crash Visual Force Simulation**:
+  - Graph visualizations must support responsive physics, drag, zoom/pan, cluster filters, node inspector drawers, and graceful empty-state handling when fewer than 2 entries exist.
+
 * **Standardized JSON Schema**:
   ```json
   {

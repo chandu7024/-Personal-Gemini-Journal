@@ -33,6 +33,7 @@ interface CognitiveAnalyticsHubProps {
   onClose: () => void;
   entries: JournalEntry[];
   onOpenEntry?: (entryId: string) => void;
+  onOpenConstellation?: () => void;
 }
 
 export const CognitiveAnalyticsHub: React.FC<CognitiveAnalyticsHubProps> = ({
@@ -40,6 +41,7 @@ export const CognitiveAnalyticsHub: React.FC<CognitiveAnalyticsHubProps> = ({
   onClose,
   entries,
   onOpenEntry,
+  onOpenConstellation,
 }) => {
   const [timeWindow, setTimeWindow] = useState<TimeWindow>("30d");
   const [isAuditing, setIsAuditing] = useState(false);
@@ -192,6 +194,21 @@ export const CognitiveAnalyticsHub: React.FC<CognitiveAnalyticsHubProps> = ({
                 </button>
               ))}
             </div>
+
+            {onOpenConstellation && (
+              <button
+                id="btn-open-constellation-from-analytics"
+                onClick={() => {
+                  onClose();
+                  onOpenConstellation();
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/70 hover:bg-purple-100 dark:hover:bg-purple-900/80 border border-purple-200 dark:border-purple-800 shadow-2xs transition-all cursor-pointer"
+                title="Launch Interactive Subconscious Constellation D3 Graph"
+              >
+                <Compass className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                <span className="hidden sm:inline">Subconscious Graph</span>
+              </button>
+            )}
 
             <button
               id="btn-run-cognitive-audit"

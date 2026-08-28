@@ -22,7 +22,7 @@ import {
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 import { stripUndefined } from "./sanitizer";
-import type { JournalEntry, JournalMessage, JournalSummary, CognitiveAnalysisResult, ReflectionMode, UserProfile, UserRole, SystemAuditLog } from "../types";
+import type { JournalEntry, JournalMessage, JournalSummary, CognitiveAnalysisResult, ReflectionMode, UserProfile, UserRole, SystemAuditLog, EmailReminderSettings } from "../types";
 
 // Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -409,4 +409,58 @@ export async function saveEntryCognitiveAnalysis(
     })
   );
 }
+
+/**
+ * Save user's email reflection reminder preferences to Firestore
+ */
+export async function saveUserReminderSettings(
+  userId: string,
+  settings: EmailReminderSettings
+): Promise<void> {
+  const userDocRef = doc(db, "users", userId);
+  await setDoc(
+    userDocRef,
+    stripUndefined({
+      reminderSettings: {
+        ...settings,
+        updatedAt: new Date().toISOString(),
+      },
+      updatedAt: serverTimestamp(),
+    }),
+    { merge: true }
+  );
+}
+
+/**
+ * Subscribe to real-time reminder settings for the active user
+ */
+export function subscribeUserReminderSettings(
+  userId: string,
+  onUpdate: (settings: EmailReminderSettings | null) => void
+) {
+  if (!userId) {
+    onUpdate(null);
+    return () => {};
+  }
+
+  const userDocRef = doc(db, "users", userId);
+  return onSnapshot(
+    userDocRef,
+    (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.reminderSettings) {
+          onUpdate(data.reminderSettings as EmailReminderSettings);
+          return;
+        }
+      }
+      onUpdate(null);
+    },
+    (err) => {
+      console.warn("[Firestore] Reminder settings snapshot error:", err);
+      onUpdate(null);
+    }
+  );
+}
+
 

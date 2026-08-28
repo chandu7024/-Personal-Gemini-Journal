@@ -8,10 +8,13 @@ import { ThreatModelModal } from "./ThreatModelModal";
 import { AdminDashboardModal } from "./AdminDashboardModal";
 import { CognitiveAnalyticsHub } from "./CognitiveAnalyticsHub";
 import { SocraticVoiceModal } from "./SocraticVoiceModal";
+import { SubconsciousConstellationModal } from "./SubconsciousConstellationModal";
+import { ReminderConfigModal } from "./ReminderConfigModal";
 import {
   subscribeToUserEntries,
   subscribeToEntryMessages,
   subscribeToUserProfile,
+  subscribeUserReminderSettings,
   createJournalEntry,
   updateJournalEntry,
   deleteJournalEntry,
@@ -20,7 +23,7 @@ import {
   saveEntryCognitiveAnalysis,
 } from "../lib/firebase";
 import { sendChatMessage, summarizeJournalEntry, analyzeCognitiveBiases } from "../lib/geminiApi";
-import type { JournalEntry, JournalMessage, ReflectionMode, EntryLocation, UserRole } from "../types";
+import type { JournalEntry, JournalMessage, ReflectionMode, EntryLocation, UserRole, EmailReminderSettings } from "../types";
 import { Loader2, Plus, Sparkles, BookOpen, Mic } from "lucide-react";
 
 interface DashboardProps {
@@ -33,6 +36,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const [messages, setMessages] = useState<JournalMessage[]>([]);
   const [userRole, setUserRole] = useState<UserRole>(user.email === "chandu7024@gmail.com" ? "admin" : "user");
+  const [reminderSettings, setReminderSettings] = useState<EmailReminderSettings | null>(null);
   
   const [isEntriesLoading, setIsEntriesLoading] = useState(true);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
@@ -45,6 +49,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [isConstellationModalOpen, setIsConstellationModalOpen] = useState(false);
+  const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
 
   // Subscribe to user profile to monitor role in real-time
   useEffect(() => {
@@ -54,8 +60,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         setUserRole(profile.role);
       }
     });
-    return () => unsubscribeProfile();
+    const unsubscribeReminders = subscribeUserReminderSettings(user.uid, (settings) => {
+      setReminderSettings(settings);
+    });
+
+    return () => {
+      unsubscribeProfile();
+      unsubscribeReminders();
+    };
   }, [user.uid]);
+
 
   // 1. Subscribe to User's Journal Entries (Isolated by user.uid in Firestore)
   useEffect(() => {
@@ -401,9 +415,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
       <Navbar
         user={user}
         userRole={userRole}
+        reminderSettings={reminderSettings}
         onSignOut={onSignOut}
         onNewEntry={handleNewEntry}
         onOpenVoiceJournal={() => setIsVoiceModalOpen(true)}
+        onOpenConstellation={() => setIsConstellationModalOpen(true)}
+        onOpenReminders={() => setIsReminderModalOpen(true)}
         onOpenThreatModel={() => setIsThreatModalOpen(true)}
         onOpenAdminConsole={() => setIsAdminModalOpen(true)}
         onOpenAnalytics={() => setIsAnalyticsModalOpen(true)}
@@ -498,6 +515,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
             onAnalyzeCognition={handleAnalyzeCognitiveBiases}
             messages={messages}
             onApplyReframeToChat={handleApplyReframeToChat}
+            onOpenReminders={() => setIsReminderModalOpen(true)}
           />
         )}
       </div>
@@ -534,9 +552,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         isOpen={isAnalyticsModalOpen}
         onClose={() => setIsAnalyticsModalOpen(false)}
         entries={entries}
+        onOpenConstellation={() => setIsConstellationModalOpen(true)}
         onOpenEntry={(id) => {
           setActiveEntryId(id);
           setIsAnalyticsModalOpen(false);
+        }}
+      />
+
+      {/* Subconscious Timeline & Semantic Echo Constellation Graph */}
+      <SubconsciousConstellationModal
+        isOpen={isConstellationModalOpen}
+        onClose={() => setIsConstellationModalOpen(false)}
+        entries={entries}
+        onSelectEntry={(id) => {
+          setActiveEntryId(id);
+          setIsConstellationModalOpen(false);
+        }}
+      />
+
+      {/* Reflection Email Reminders Configuration Panel */}
+      <ReminderConfigModal
+        isOpen={isReminderModalOpen}
+        onClose={() => setIsReminderModalOpen(false)}
+        userId={user.uid}
+        userEmail={user.email}
+        initialSettings={reminderSettings}
+        onSaved={(newSettings) => {
+          setReminderSettings(newSettings);
         }}
       />
     </div>

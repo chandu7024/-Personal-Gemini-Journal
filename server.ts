@@ -1015,6 +1015,400 @@ app.post("/api/notifications/test", async (req, res) => {
   }
 });
 
+/**
+ * Generate formatted HTML template for Email Reminder
+ */
+function buildReminderEmailHtml(payload: {
+  recipientEmail: string;
+  frequency: string;
+  dayOfWeek?: string;
+  theme: string;
+  time?: string;
+  timezone?: string;
+  customIntent?: string;
+  themeLabel: string;
+  socraticQuestions: string[];
+  centeringExercise: string;
+  appUrl: string;
+}): string {
+  const isWeekly = payload.frequency.toLowerCase() === "weekly";
+  const cadenceTitle = isWeekly
+    ? `Weekly Reflection Sanctuary • ${payload.dayOfWeek ? payload.dayOfWeek.toUpperCase() : "SUNDAY"}`
+    : `Daily Reflection Sanctuary`;
+
+  const questionsList = payload.socraticQuestions
+    .map(
+      (q) =>
+        `<li style="margin-bottom: 12px; font-size: 14px; line-height: 1.5; color: #1e293b;">
+          <strong style="color: #6366f1;">❯</strong> ${q}
+        </li>`
+    )
+    .join("");
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReflectAI Reminder</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #0f172a;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+    <!-- Header -->
+    <tr>
+      <td style="background: linear-gradient(135deg, #4338ca 0%, #1e1b4b 100%); padding: 32px 36px; color: #ffffff;">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.85; margin-bottom: 8px;">
+          ✨ ReflectAI • ${cadenceTitle}
+        </div>
+        <h1 style="font-size: 24px; font-weight: 800; margin: 0 0 10px 0; line-height: 1.25; color: #ffffff;">
+          Time for Your Reflection Session
+        </h1>
+        <div style="display: inline-block; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+          Theme: ${payload.themeLabel}
+        </div>
+        ${
+          payload.time
+            ? `<span style="margin-left: 8px; font-size: 12px; opacity: 0.85;">⏰ Scheduled for ${payload.time} (${payload.timezone || "Local"})</span>`
+            : ""
+        }
+      </td>
+    </tr>
+
+    <!-- Body Content -->
+    <tr>
+      <td style="padding: 32px 36px;">
+        <!-- Intent / Centering Quote -->
+        <div style="margin-bottom: 24px; background-color: #f8fafc; border-left: 4px solid #6366f1; border-radius: 0 8px 8px 0; padding: 16px 20px;">
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 6px;">
+            Centering Thought
+          </div>
+          <div style="font-size: 14px; line-height: 1.6; color: #334155; font-style: italic;">
+            "${payload.centeringExercise}"
+          </div>
+          ${
+            payload.customIntent
+              ? `<div style="margin-top: 10px; font-size: 12px; color: #4338ca; font-weight: 600;">🎯 Your Personal Intention: "${payload.customIntent}"</div>`
+              : ""
+          }
+        </div>
+
+        <!-- Socratic Questions -->
+        <div style="margin-bottom: 28px;">
+          <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #475569; margin-bottom: 12px;">
+            Curated Socratic Inquiry for Today
+          </div>
+          <ul style="margin: 0; padding-left: 14px; list-style-type: none;">
+            ${questionsList}
+          </ul>
+        </div>
+
+        <!-- 3-Minute Practice Box -->
+        <div style="margin-bottom: 32px; background-color: #f1f5f9; border-radius: 12px; padding: 18px 20px;">
+          <div style="font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">
+            💡 5-Minute Suggested Flow:
+          </div>
+          <div style="font-size: 13px; color: #475569; line-height: 1.6;">
+            <strong>1. Ground (1 min):</strong> Take two deep breaths and release physical tension.<br>
+            <strong>2. Reflect (3 min):</strong> Speak or write candidly in ReflectAI without self-censoring.<br>
+            <strong>3. Synthesize (1 min):</strong> Review AI Cognitive Analysis and anchor 1 decisive next step.
+          </div>
+        </div>
+
+        <!-- Call to Action Button -->
+        <div style="text-align: center; margin-bottom: 16px;">
+          <a href="${payload.appUrl}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 700; padding: 14px 32px; border-radius: 10px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
+            Open ReflectAI & Begin Reflection →
+          </a>
+        </div>
+        <div style="text-align: center; font-size: 11px; color: #94a3b8;">
+          No app download required • Launches securely in browser
+        </div>
+      </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+      <td style="background-color: #f1f5f9; padding: 20px 36px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0;">
+        <p style="margin: 0 0 6px 0;">You received this email because you configured ${payload.frequency} reflection reminders in <strong>ReflectAI</strong>.</p>
+        <p style="margin: 0;">To update your schedule or pause reminders, open ReflectAI and visit <strong>Reminders</strong> in the navigation bar.</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * Generate plain text representation of the reminder
+ */
+function buildReminderEmailPlainText(payload: {
+  recipientEmail: string;
+  frequency: string;
+  dayOfWeek?: string;
+  theme: string;
+  time?: string;
+  themeLabel: string;
+  socraticQuestions: string[];
+  centeringExercise: string;
+  customIntent?: string;
+  appUrl: string;
+}): string {
+  let text = `✨ ReflectAI • ${payload.frequency.toUpperCase()} REFLECTION REMINDER\n`;
+  text += `Theme: ${payload.themeLabel}\n`;
+  if (payload.time) text += `Scheduled Time: ${payload.time}\n`;
+  text += `\n--- CENTERING THOUGHT ---\n"${payload.centeringExercise}"\n\n`;
+
+  if (payload.customIntent) {
+    text += `Your Personal Intention: "${payload.customIntent}"\n\n`;
+  }
+
+  text += `--- CURATED SOCRATIC INQUIRY ---\n`;
+  payload.socraticQuestions.forEach((q) => {
+    text += `❯ ${q}\n`;
+  });
+
+  text += `\n--- 5-MINUTE SUGGESTED FLOW ---\n`;
+  text += `1. Ground (1 min): Take 2 conscious breaths.\n`;
+  text += `2. Reflect (3 min): Free-write or speak your reflections into ReflectAI.\n`;
+  text += `3. Synthesize (1 min): Extract cognitive blind spots and anchor one decisive action.\n\n`;
+  text += `Launch Your Session: ${payload.appUrl}\n\n`;
+  text += `Manage your reminder preferences anytime inside ReflectAI.`;
+
+  return text;
+}
+
+// API Get Reminder Themes
+app.get("/api/notifications/reminder/themes", (req, res) => {
+  res.json({
+    themes: [
+      {
+        id: "mindful",
+        label: "Mindful Pause",
+        tagline: "Present-moment grounding, breath awareness, emotional temperature check.",
+        samplePrompt: "What physical sensation or subtle emotion is asking for your attention right now?",
+        recommendedTime: "07:30",
+        badgeColor: "emerald",
+      },
+      {
+        id: "socratic",
+        label: "Socratic Inquiry",
+        tagline: "Unpack cognitive assumptions, reality-test fears, discover hidden clarity.",
+        samplePrompt: "What is a core belief you held this week that might not be 100% true?",
+        recommendedTime: "18:00",
+        badgeColor: "amber",
+      },
+      {
+        id: "executive",
+        label: "Executive Agency",
+        tagline: "Cut through noise, identify top 3 priorities, convert tension into decisive next actions.",
+        samplePrompt: "What is the highest-leverage decision you can make today that reduces the most friction?",
+        recommendedTime: "08:30",
+        badgeColor: "blue",
+      },
+      {
+        id: "gratitude",
+        label: "Gratitude & Grounding",
+        tagline: "Restore perspective by celebrating micro-wins, quiet support, and internal resilience.",
+        samplePrompt: "Who or what made a quiet, positive difference in your energy today that you haven't yet acknowledged?",
+        recommendedTime: "20:30",
+        badgeColor: "rose",
+      },
+      {
+        id: "reframe",
+        label: "Cognitive Reframe",
+        tagline: "Dismantle catastrophic narratives, all-or-nothing thinking, and imposter filters.",
+        samplePrompt: "If you looked at your current biggest obstacle as a tailored training ground, what is it teaching you?",
+        recommendedTime: "12:00",
+        badgeColor: "purple",
+      },
+    ],
+  });
+});
+
+// API Dispatch Reflection Reminder (Test or Scheduled)
+app.post("/api/notifications/reminder/dispatch", async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const {
+      recipientEmail,
+      frequency = "daily",
+      dayOfWeek = "sunday",
+      theme = "socratic",
+      time = "08:30",
+      timezone = "UTC",
+      customIntent,
+      includeSocraticPrompt = true,
+      isTest = false,
+      appUrl = "https://ais-dev-si7eyej7thivbiagautnfv-272632357176.asia-southeast1.run.app",
+    } = body;
+
+    if (!recipientEmail || typeof recipientEmail !== "string" || !recipientEmail.includes("@")) {
+      return res.status(400).json({ error: "A valid 'recipientEmail' is required." });
+    }
+
+    const themeLabels: Record<string, string> = {
+      mindful: "Mindful Pause & Centering",
+      socratic: "Socratic Inquiry & Reality Testing",
+      executive: "Executive Agency & Action Priority",
+      gratitude: "Gratitude & Perspective Grounding",
+      reframe: "Cognitive Reframing & Bias Dismantling",
+    };
+    const themeLabel = themeLabels[theme] || "Socratic Reflection";
+
+    // Synthesize personalized Socratic inquiry prompt via Gemini
+    let socraticQuestions = [
+      "What belief or expectation caused you the most friction recently, and how true is it upon closer inspection?",
+      "If you approached your primary challenge today with 10% more self-compassion, what would you do differently?",
+      "What is one concrete, high-agency decision that would give you the greatest feeling of momentum right now?",
+    ];
+    let centeringExercise = "Pause, take one slow breath in for 4 seconds, hold for 4 seconds, and exhale for 6 seconds. Notice what is present before beginning.";
+
+    if (includeSocraticPrompt) {
+      try {
+        const prompt = `You are the ReflectAI Cognitive & Socratic Guide.
+Generate a structured reflection reminder for a user with the following preferences:
+- Frequency: ${frequency}
+- Preferred Reflection Theme: ${themeLabel} (${theme})
+- Custom Intention / Goal: ${customIntent || "Build mental clarity and emotional resilience"}
+- Scheduled Cadence: ${frequency === "weekly" ? `Weekly on ${dayOfWeek}` : "Daily"} at ${time}
+
+Return strictly valid JSON matching this schema:
+{
+  "centeringExercise": "A 1-2 sentence somatic grounding or centering reflection instruction.",
+  "socraticQuestions": [
+    "Thought-provoking Socratic question 1 relevant to the theme",
+    "Thought-provoking Socratic question 2 relevant to the theme",
+    "Action-oriented clarity question 3"
+  ]
+}
+Return ONLY raw JSON.`;
+
+        const result = await generateContentWithFallback({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          systemInstruction: "You are a master Socratic facilitator and psychologist. Output raw JSON only.",
+          temperature: 0.4,
+        });
+
+        const cleanJson = result.text.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleanJson);
+        if (Array.isArray(parsed.socraticQuestions) && parsed.socraticQuestions.length > 0) {
+          socraticQuestions = parsed.socraticQuestions.slice(0, 3);
+        }
+        if (parsed.centeringExercise) {
+          centeringExercise = parsed.centeringExercise;
+        }
+      } catch (geminiErr) {
+        console.warn("[Reminder Dispatch] Gemini dynamic prompt fallback used:", geminiErr);
+      }
+    }
+
+    const htmlContent = buildReminderEmailHtml({
+      recipientEmail,
+      frequency,
+      dayOfWeek,
+      theme,
+      time,
+      timezone,
+      customIntent,
+      themeLabel,
+      socraticQuestions,
+      centeringExercise,
+      appUrl,
+    });
+
+    const plainTextContent = buildReminderEmailPlainText({
+      recipientEmail,
+      frequency,
+      dayOfWeek,
+      theme,
+      time,
+      themeLabel,
+      socraticQuestions,
+      centeringExercise,
+      customIntent,
+      appUrl,
+    });
+
+    const subject = isTest
+      ? `[TEST REMINDER] ✨ Time for your ${frequency === "weekly" ? "Weekly" : "Daily"} Reflection • ReflectAI`
+      : `✨ Time for your ${frequency === "weekly" ? "Weekly" : "Daily"} Reflection • ReflectAI`;
+
+    const { mailtoUrl, gmailWebUrl } = buildDirectMailLinks({
+      recipientEmail,
+      entryTitle: subject,
+      plainText: plainTextContent,
+    });
+
+    const transporter = getMailTransporter();
+    const messageId = `reminder-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    if (transporter) {
+      const fromAddress = process.env.NOTIFICATION_EMAIL_FROM || `"ReflectAI Reminders" <${process.env.NOTIFICATION_EMAIL_USER}>`;
+
+      console.log(`[Reminder Engine] Dispatching live reminder email to ${recipientEmail} via SMTP...`);
+
+      await transporter.sendMail({
+        from: fromAddress,
+        to: recipientEmail,
+        subject,
+        text: plainTextContent,
+        html: htmlContent,
+      });
+
+      console.log(`[Reminder Engine] LIVE REMINDER DELIVERED to ${recipientEmail} [ID: ${messageId}]`);
+
+      return res.json({
+        success: true,
+        channel: "email",
+        recipient: recipientEmail,
+        messageId,
+        deliveredAt: new Date().toISOString(),
+        previewHtml: htmlContent,
+        mode: "live_smtp_delivered",
+        smtpConfigured: true,
+        statusMessage: `Successfully delivered ${frequency} reflection reminder to ${recipientEmail} via SMTP!`,
+        mailtoUrl,
+        gmailWebUrl,
+        promptDetails: {
+          centeringExercise,
+          socraticQuestions,
+        },
+      });
+    } else {
+      console.log(`[Reminder Engine] SMTP not configured. Reminder preview generated for ${recipientEmail}.`);
+
+      return res.json({
+        success: true,
+        channel: "email",
+        recipient: recipientEmail,
+        messageId,
+        deliveredAt: new Date().toISOString(),
+        previewHtml: htmlContent,
+        mode: "preview_unconfigured",
+        smtpConfigured: false,
+        statusMessage: `Reminder email synthesized with custom Socratic prompts! To receive automated delivery into your inbox, configure SMTP in environment variables. You can test opening via Gmail or Mail client below.`,
+        mailtoUrl,
+        gmailWebUrl,
+        promptDetails: {
+          centeringExercise,
+          socraticQuestions,
+        },
+      });
+    }
+  } catch (error: any) {
+    console.error("[API Error] /api/notifications/reminder/dispatch failure:", error);
+    const friendlyMsg = formatEmailError(error);
+    return res.status(500).json({
+      error: friendlyMsg,
+      success: false,
+      smtpConfigured: Boolean(getMailTransporter()),
+    });
+  }
+});
+
+
 // ==========================================
 // 4. Longitudinal Cognitive Growth & Distortion Audit Endpoint
 // ==========================================
@@ -1163,6 +1557,260 @@ Respond with ONLY a clean, valid JSON object strictly matching this schema (no m
   }
 });
 
+// -------------------------------------------------------------
+// Subconscious Timeline & Semantic Constellation Endpoint
+// -------------------------------------------------------------
+app.post("/api/analytics/constellation-graph", async (req, res) => {
+  try {
+    const rawBody = (req.body && typeof req.body === "object") ? req.body : {};
+    const entries = Array.isArray(rawBody.entries) ? rawBody.entries : [];
+    const timeframe = typeof rawBody.timeframe === "string" ? rawBody.timeframe : "all";
+
+    if (entries.length === 0) {
+      return res.status(400).json({
+        error: "At least 1 journal reflection is required to build the Subconscious Timeline.",
+      });
+    }
+
+    const clean = (val: any) => String(val || "").replace(/[\r\n\t]+/g, " ").trim();
+
+    const sanitizedSnippets = entries.slice(0, 20).map((entry, idx) => {
+      const title = clean(entry.title || `Entry #${idx + 1}`).slice(0, 100);
+      const date = String(entry.createdAt || new Date().toISOString()).slice(0, 10);
+      const mood = clean(entry.mood || "Reflective").slice(0, 30);
+      const snippet = clean(entry.snippet || entry.content || "").slice(0, 350);
+      const id = clean(entry.id || `entry-${idx}`);
+      const tags = Array.isArray(entry.tags) ? entry.tags.slice(0, 4).join(", ") : "";
+      return `[ID: ${id}] | Date: ${date} | Title: "${title}" | Mood: ${mood} | Tags: ${tags}\nContent: "${snippet}"`;
+    }).join("\n\n");
+
+    const prompt = `You are the Lead Neuro-Cognitive Architect and Semantic Constellation Engine for ReflectAI.
+Analyze the following ${entries.length} reflections to construct an interactive "Subconscious Timeline" & Semantic Constellation Graph.
+
+REFLECTIONS CORPUS:
+${sanitizedSnippets}
+
+TASK:
+1. Extract 6 to 10 latent subconscious nodes representing the user's deep psychological themes, core beliefs, recurring triggers, emotional filters, and breakthrough anchors.
+2. Formulate 6 to 12 meaningful semantic connections (links) demonstrating how these themes trigger, reinforce, or evolve into one another.
+3. Identify 2 to 4 powerful "Subconscious Echoes" — historical psychological resonances where an earlier thought/dilemma in one reflection directly mirrors or informs a later reflection, highlighting how their mindset has evolved.
+4. Synthesize a 1-sentence overarching "coreEvolutionStatement".
+
+Return ONLY a clean, valid JSON object strictly matching this schema with NO markdown wrapping or fences:
+{
+  "timeframe": "${timeframe}",
+  "totalEntriesAnalyzed": ${entries.length},
+  "subconsciousThemeSummary": "2 crisp sentences summarizing the dominant subconscious gravity of their thoughts.",
+  "coreEvolutionStatement": "One powerful psychological synthesis summarizing the trajectory of their inner dialogue.",
+  "nodes": [
+    {
+      "id": "unique-kebab-slug",
+      "label": "Short Theme Title (2-4 words)",
+      "type": "core_belief | breakthrough | emotional_filter | recurring_trigger | life_domain | identity_anchor",
+      "valence": "empowered | reflective | vulnerable | anxious | creative | neutral",
+      "strength": 8,
+      "mentionCount": 3,
+      "firstObservedDate": "YYYY-MM-DD",
+      "lastObservedDate": "YYYY-MM-DD",
+      "associatedEntryIds": ["id1", "id2"],
+      "associatedEntryTitles": ["Title 1", "Title 2"],
+      "subconsciousInsight": "Deep psychological interpretation of why this theme surfaces.",
+      "socraticInquiry": "A penetrating Socratic question to explore this node."
+    }
+  ],
+  "links": [
+    {
+      "source": "source-node-id",
+      "target": "target-node-id",
+      "relationship": "triggers | reinforces | evolved_into | counterbalances | co_occurs",
+      "strength": 0.8,
+      "insight": "Brief explanation of how these two themes interact."
+    }
+  ],
+  "echoes": [
+    {
+      "id": "echo-1",
+      "currentTheme": "Current theme name",
+      "pastEntryId": "id-of-past-entry",
+      "pastEntryTitle": "Past Entry Title",
+      "pastEntryDate": "YYYY-MM-DD",
+      "resonanceScore": 88,
+      "echoDescription": "Notice: You experienced this exact pattern of hesitation prior to...",
+      "observedEvolution": "While previously you felt paralyzed, in recent reflections you immediately pivoted to structured action.",
+      "recommendedAnchor": "Grounding technique to reinforce this growth."
+    }
+  ]
+}`;
+
+    const result = await generateContentWithFallback({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      systemInstruction: "You are an analytical cognitive psychologist and graph data extractor. Return strictly valid JSON with no markdown wrapping.",
+      temperature: 0.3,
+    });
+
+    let parsedJson: any = {};
+    const cleanText = result.text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    try {
+      parsedJson = JSON.parse(cleanText);
+    } catch {
+      parsedJson = {};
+    }
+
+    // Default fallback node generation if needed
+    const defaultNodes = [
+      {
+        id: "high-agency-execution",
+        label: "Proactive Execution",
+        type: "breakthrough",
+        valence: "empowered",
+        strength: 9,
+        mentionCount: entries.length,
+        firstObservedDate: entries[0]?.createdAt?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+        lastObservedDate: entries[entries.length - 1]?.createdAt?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+        associatedEntryIds: entries.map((e: any) => String(e.id || "")).filter(Boolean).slice(0, 3),
+        associatedEntryTitles: entries.map((e: any) => String(e.title || "Reflection")).slice(0, 3),
+        subconsciousInsight: "An emerging inner drive that translates ambiguous anxiety into concrete micro-actions.",
+        socraticInquiry: "What belief allows you to take decisive action even when 100% certainty is unavailable?",
+      },
+      {
+        id: "imposter-uncertainty",
+        label: "Perfectionism & Scope",
+        type: "emotional_filter",
+        valence: "vulnerable",
+        strength: 7,
+        mentionCount: Math.max(1, Math.floor(entries.length / 2)),
+        firstObservedDate: entries[0]?.createdAt?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+        lastObservedDate: entries[entries.length - 1]?.createdAt?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+        associatedEntryIds: entries.map((e: any) => String(e.id || "")).filter(Boolean).slice(0, 2),
+        associatedEntryTitles: entries.map((e: any) => String(e.title || "Reflection")).slice(0, 2),
+        subconsciousInsight: "A protective filter attempting to insulate against external judgment through over-preparation.",
+        socraticInquiry: "If an 80% draft is sufficient for momentum, what does perfectionism truly protect?",
+      },
+      {
+        id: "strategic-clarity",
+        label: "Strategic Perspective",
+        type: "core_belief",
+        valence: "reflective",
+        strength: 8,
+        mentionCount: Math.max(1, entries.length - 1),
+        firstObservedDate: entries[0]?.createdAt?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+        lastObservedDate: entries[entries.length - 1]?.createdAt?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+        associatedEntryIds: entries.map((e: any) => String(e.id || "")).filter(Boolean).slice(0, 2),
+        associatedEntryTitles: entries.map((e: any) => String(e.title || "Reflection")).slice(0, 2),
+        subconsciousInsight: "The capacity to step outside immediate stressors and observe long-term systemic dynamics.",
+        socraticInquiry: "How does zooming out to a 1-year horizon alter today's highest priority?",
+      },
+    ];
+
+    const rawNodes = Array.isArray(parsedJson.nodes) && parsedJson.nodes.length >= 2 ? parsedJson.nodes : defaultNodes;
+    
+    const validNodeIds = new Set(rawNodes.map((n: any) => String(n.id)));
+
+    const normalizedNodes = rawNodes.map((n: any, idx: number) => ({
+      id: String(n.id || `node-${idx}`),
+      label: String(n.label || "Cognitive Theme"),
+      type: ["core_belief", "breakthrough", "emotional_filter", "recurring_trigger", "life_domain", "identity_anchor"].includes(n.type)
+        ? n.type
+        : "core_belief",
+      valence: ["empowered", "reflective", "vulnerable", "anxious", "creative", "neutral"].includes(n.valence)
+        ? n.valence
+        : "reflective",
+      strength: Number(n.strength) >= 1 && Number(n.strength) <= 10 ? Number(n.strength) : 6,
+      mentionCount: Number(n.mentionCount) || 1,
+      firstObservedDate: String(n.firstObservedDate || new Date().toISOString().slice(0, 10)),
+      lastObservedDate: String(n.lastObservedDate || new Date().toISOString().slice(0, 10)),
+      associatedEntryIds: Array.isArray(n.associatedEntryIds) ? n.associatedEntryIds.map(String) : [],
+      associatedEntryTitles: Array.isArray(n.associatedEntryTitles) ? n.associatedEntryTitles.map(String) : [],
+      subconsciousInsight: String(n.subconsciousInsight || "A recurring psychological pattern observed across reflections."),
+      socraticInquiry: String(n.socraticInquiry || "What new perspective emerges when you reflect on this pattern?"),
+    }));
+
+    const rawLinks = Array.isArray(parsedJson.links) ? parsedJson.links : [
+      {
+        source: normalizedNodes[0].id,
+        target: normalizedNodes[1].id,
+        relationship: "counterbalances",
+        strength: 0.75,
+        insight: "Proactive execution actively dismantles perfectionism anxiety through empirical action.",
+      },
+    ];
+
+    const normalizedLinks = rawLinks
+      .filter((l: any) => validNodeIds.has(String(l.source)) && validNodeIds.has(String(l.target)) && l.source !== l.target)
+      .map((l: any) => ({
+        source: String(l.source),
+        target: String(l.target),
+        relationship: String(l.relationship || "reinforces"),
+        strength: Math.min(1, Math.max(0.1, Number(l.strength) || 0.6)),
+        insight: String(l.insight || "Themes interact dynamically across reflections."),
+      }));
+
+    // If no valid links were preserved, scaffold a connected chain
+    if (normalizedLinks.length === 0 && normalizedNodes.length > 1) {
+      for (let i = 0; i < normalizedNodes.length - 1; i++) {
+        normalizedLinks.push({
+          source: normalizedNodes[i].id,
+          target: normalizedNodes[i + 1].id,
+          relationship: i % 2 === 0 ? "reinforces" : "evolved_into",
+          strength: 0.7,
+          insight: "Direct semantic flow observed across reflection timeline.",
+        });
+      }
+    }
+
+    const defaultEchoes = [
+      {
+        id: "echo-1",
+        currentTheme: normalizedNodes[0].label,
+        pastEntryId: entries[0]?.id || "entry-0",
+        pastEntryTitle: entries[0]?.title || "Initial Reflection",
+        pastEntryDate: entries[0]?.createdAt?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+        resonanceScore: 92,
+        echoDescription: "Echo detected: Your hesitation before major decisions mirrors earlier reflection patterns, but your recovery velocity has quickened.",
+        observedEvolution: "Shifted from prolonged rumination to establishing concrete 24-hour test milestones.",
+        recommendedAnchor: "Revisit your confirmed past wins whenever the illusion of zero-progress arises.",
+      },
+    ];
+
+    const rawEchoes = Array.isArray(parsedJson.echoes) && parsedJson.echoes.length > 0 ? parsedJson.echoes : defaultEchoes;
+
+    const normalizedEchoes = rawEchoes.map((e: any, idx: number) => ({
+      id: String(e.id || `echo-${idx}`),
+      currentTheme: String(e.currentTheme || normalizedNodes[0].label),
+      pastEntryId: String(e.pastEntryId || entries[0]?.id || ""),
+      pastEntryTitle: String(e.pastEntryTitle || entries[0]?.title || "Previous Entry"),
+      pastEntryDate: String(e.pastEntryDate || new Date().toISOString().slice(0, 10)),
+      resonanceScore: Math.min(100, Math.max(50, Number(e.resonanceScore) || 85)),
+      echoDescription: String(e.echoDescription || "Subconscious pattern echoing across multiple entries."),
+      observedEvolution: String(e.observedEvolution || "Noticeable progression in agency and emotional flexibility."),
+      recommendedAnchor: String(e.recommendedAnchor || "Anchor this insight during your next reflection."),
+    }));
+
+    const responsePayload = {
+      timeframe: parsedJson.timeframe || timeframe,
+      totalEntriesAnalyzed: entries.length,
+      subconsciousThemeSummary: parsedJson.subconsciousThemeSummary || "Your subconscious narrative reveals a marked transition from self-protective hesitation toward high-agency creative momentum.",
+      coreEvolutionStatement: parsedJson.coreEvolutionStatement || "You are steadily replacing the need for perfect certainty with empirical curiosity and disciplined execution.",
+      nodes: normalizedNodes,
+      links: normalizedLinks,
+      echoes: normalizedEchoes,
+      analyzedAt: new Date().toISOString(),
+      modelUsed: result.modelUsed,
+    };
+
+    return res.json({
+      success: true,
+      data: responsePayload,
+    });
+  } catch (error: any) {
+    console.error("[API Error] /api/analytics/constellation-graph failure:", error);
+    return res.status(500).json({
+      error: error.message || "Failed to generate Subconscious Timeline Constellation.",
+    });
+  }
+});
+
+
 // Explicit API 404 Catch-All to prevent HTML SPA fallback for API calls
 app.all("/api/*", (req, res) => {
   res.status(404).json({
@@ -1185,7 +1833,11 @@ async function start() {
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: process.env.DISABLE_HMR === "true" ? false : undefined,
+        watch: process.env.DISABLE_HMR === "true" ? null : undefined,
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);

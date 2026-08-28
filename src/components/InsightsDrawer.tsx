@@ -21,6 +21,7 @@ import {
   Brain,
   ShieldAlert,
   Zap,
+  Bell,
 } from "lucide-react";
 import type { JournalSummary, JournalEntry, CognitiveAnalysisResult, JournalMessage } from "../types";
 import { sendEmailNotification } from "../lib/notifications";
@@ -39,6 +40,7 @@ interface InsightsDrawerProps {
   onAnalyzeCognition: () => void;
   messages: JournalMessage[];
   onApplyReframeToChat?: (reframeText: string) => void;
+  onOpenReminders?: () => void;
 }
 
 export const InsightsDrawer: React.FC<InsightsDrawerProps> = ({
@@ -54,6 +56,7 @@ export const InsightsDrawer: React.FC<InsightsDrawerProps> = ({
   onAnalyzeCognition,
   messages,
   onApplyReframeToChat,
+  onOpenReminders,
 }) => {
   const [activeTab, setActiveTab] = useState<"summary" | "radar" | "email">("summary");
   const [copied, setCopied] = useState(false);
@@ -515,6 +518,32 @@ ${summary.suggestedTopics.map((t) => `- ${t}`).join("\n")}
                     )}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Automated Daily/Weekly Reminder Schedule Banner */}
+            {onOpenReminders && (
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border border-indigo-200/80 dark:border-indigo-800/80 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                    <Bell className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                      Scheduled Reflection Invitations
+                    </h5>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      Automate daily or weekly email check-ins with tailored Socratic prompts.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onOpenReminders}
+                  className="px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shrink-0 shadow-xs"
+                >
+                  Configure
+                </button>
               </div>
             )}
 

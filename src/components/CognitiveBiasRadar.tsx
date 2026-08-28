@@ -211,21 +211,36 @@ export const CognitiveBiasRadar: React.FC<CognitiveBiasRadarProps> = ({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                  <div className={`p-2.5 rounded-lg border text-center ${getScoreColor(analysis.flexibilityScore)}`}>
-                    <span className="block text-[10px] font-semibold opacity-80 uppercase tracking-tight">Flexibility</span>
-                    <span className="text-lg font-black">{analysis.flexibilityScore}</span>
-                    <span className="block text-[9px] opacity-70">/ 100</span>
+                <div className="grid grid-cols-3 gap-2.5 items-stretch">
+                  <div className={`p-3 rounded-xl border flex flex-col justify-between h-full text-center ${getScoreColor(analysis.flexibilityScore)}`}>
+                    <span className="block text-[10px] font-bold uppercase tracking-wider opacity-85">Flexibility</span>
+                    <div className="my-1">
+                      <span className="text-xl font-black font-display tracking-tight">{analysis.flexibilityScore}</span>
+                      <span className="text-[10px] opacity-70 font-mono">/100</span>
+                    </div>
+                    <div className="w-full bg-slate-200/60 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
+                      <div className="bg-current h-full rounded-full" style={{ width: `${Math.min(100, analysis.flexibilityScore)}%` }} />
+                    </div>
                   </div>
-                  <div className={`p-2.5 rounded-lg border text-center ${getScoreColor(analysis.agencyScore)}`}>
-                    <span className="block text-[10px] font-semibold opacity-80 uppercase tracking-tight">Agency</span>
-                    <span className="text-lg font-black">{analysis.agencyScore}</span>
-                    <span className="block text-[9px] opacity-70">/ 100</span>
+                  <div className={`p-3 rounded-xl border flex flex-col justify-between h-full text-center ${getScoreColor(analysis.agencyScore)}`}>
+                    <span className="block text-[10px] font-bold uppercase tracking-wider opacity-85">Agency</span>
+                    <div className="my-1">
+                      <span className="text-xl font-black font-display tracking-tight">{analysis.agencyScore}</span>
+                      <span className="text-[10px] opacity-70 font-mono">/100</span>
+                    </div>
+                    <div className="w-full bg-slate-200/60 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
+                      <div className="bg-current h-full rounded-full" style={{ width: `${Math.min(100, analysis.agencyScore)}%` }} />
+                    </div>
                   </div>
-                  <div className={`p-2.5 rounded-lg border text-center ${getScoreColor(analysis.emotionalResilienceScore)}`}>
-                    <span className="block text-[10px] font-semibold opacity-80 uppercase tracking-tight">Resilience</span>
-                    <span className="text-lg font-black">{analysis.emotionalResilienceScore}</span>
-                    <span className="block text-[9px] opacity-70">/ 100</span>
+                  <div className={`p-3 rounded-xl border flex flex-col justify-between h-full text-center ${getScoreColor(analysis.emotionalResilienceScore)}`}>
+                    <span className="block text-[10px] font-bold uppercase tracking-wider opacity-85">Resilience</span>
+                    <div className="my-1">
+                      <span className="text-xl font-black font-display tracking-tight">{analysis.emotionalResilienceScore}</span>
+                      <span className="text-[10px] opacity-70 font-mono">/100</span>
+                    </div>
+                    <div className="w-full bg-slate-200/60 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
+                      <div className="bg-current h-full rounded-full" style={{ width: `${Math.min(100, analysis.emotionalResilienceScore)}%` }} />
+                    </div>
                   </div>
                 </div>
 

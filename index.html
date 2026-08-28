@@ -9,35 +9,71 @@
     <meta property="og:description" content="User-authenticated personal journaling, cognitive bias diagnostics, and real-time Socratic voice journaling powered by Gemini and Firestore." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script>
       // Suppress benign Vite dev server HMR websocket connection warnings and unhandled rejections
-      window.addEventListener('unhandledrejection', function (event) {
-        var reason = event.reason;
-        var msg = (reason && (reason.message || reason.stack || String(reason))) || '';
-        if (
-          msg.includes('WebSocket') ||
-          msg.includes('[vite]') ||
-          msg.includes('failed to connect to websocket') ||
-          msg.includes('closed without opened')
-        ) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-        }
-      });
-
-      window.addEventListener('error', function (event) {
-        var msg = (event && (event.message || (event.error && event.error.message))) || '';
-        if (
-          typeof msg === 'string' &&
-          (msg.includes('WebSocket') ||
+      (function() {
+        var originalConsoleError = console.error;
+        var originalConsoleWarn = console.warn;
+        
+        console.error = function() {
+          var args = Array.prototype.slice.call(arguments);
+          var msg = args.join(' ');
+          if (
+            msg.includes('WebSocket') ||
             msg.includes('[vite]') ||
             msg.includes('failed to connect to websocket') ||
-            msg.includes('closed without opened'))
-        ) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-        }
-      });
+            msg.includes('closed without opened')
+          ) {
+            return;
+          }
+          originalConsoleError.apply(console, arguments);
+        };
+
+        console.warn = function() {
+          var args = Array.prototype.slice.call(arguments);
+          var msg = args.join(' ');
+          if (
+            msg.includes('WebSocket') ||
+            msg.includes('[vite]') ||
+            msg.includes('failed to connect to websocket') ||
+            msg.includes('closed without opened')
+          ) {
+            return;
+          }
+          originalConsoleWarn.apply(console, arguments);
+        };
+
+        window.addEventListener('unhandledrejection', function (event) {
+          var reason = event.reason;
+          var msg = (reason && (reason.message || reason.stack || String(reason))) || '';
+          if (
+            msg.includes('WebSocket') ||
+            msg.includes('[vite]') ||
+            msg.includes('failed to connect to websocket') ||
+            msg.includes('closed without opened')
+          ) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        });
+
+        window.addEventListener('error', function (event) {
+          var msg = (event && (event.message || (event.error && event.error.message))) || '';
+          if (
+            typeof msg === 'string' &&
+            (msg.includes('WebSocket') ||
+              msg.includes('[vite]') ||
+              msg.includes('failed to connect to websocket') ||
+              msg.includes('closed without opened'))
+          ) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        });
+      })();
     </script>
   </head>
   <body>

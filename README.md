@@ -200,122 +200,111 @@ service cloud.firestore {
 
 ---
 ## 🏗️ Technical Sequence Diagram
-User
- │
- │ Submit reflection
- ▼
+User Reflection
+      │
+      ▼
 React UI
- │
- │ POST /api/reflections
- ▼
+      │
+      ▼
 Express API
- │
- ├── Validate input
- ├── Authenticate user
- ├── Sanitize content
- │
- ▼
-Gemini Service
- │
- │ Prompt + reflection context
- ▼
+      │
+      ├── Authentication
+      ├── Input Validation
+      ├── Context Retrieval
+      │
+      ▼
+Prompt Construction
+      │
+      ├── System Instructions
+      ├── User Reflection
+      ├── Conversation Context
+      └── Historical Context
+      │
+      ▼
 Gemini
- │
- │ Structured response
- ▼
-Gemini Service
- │
- ├── Validate response
- └── Apply fallback/error handling
- │
- ▼
+      │
+      ▼
+Response Validation
+      │
+      ├── Valid → Process
+      └── Failure → Fallback / Retry
+      │
+      ▼
 Firestore
- │
- └── Store reflection + insight
- │
- ▼
-React UI
- │
- └── Display insight
+      │
+      ▼
+React Dashboard
+
+| Gemini capability     | Input                  | Output              |
+| --------------------- | ---------------------- | ------------------- |
+| Socratic dialogue     | User reflection        | Follow-up question  |
+| Cognitive analysis    | Reflection             | Patterns + severity |
+| Executive synthesis   | Reflection history     | Summary + themes    |
+| Goal generation       | Insight                | Action steps        |
+| Reminder generation   | User context           | Personalized prompt |
+| Longitudinal analysis | Historical reflections | Trends              |
+
 
 ## 🏗️ Technical Architecture & Stack
 
-```                    ┌──────────────────────┐
-                    │       User           │
-                    └──────────┬───────────┘
-                               │
-                       Firebase Auth
-                               │
-                               ▼
-                    ┌──────────────────────┐
-                    │   React / Vite UI    │
-                    └──────────┬───────────┘
-                               │
-                     Authenticated Request
-                               │
-                               ▼
-              ┌────────────────────────────────┐
-              │     Cloud Run / Express        │
-              │                                │
-              │ Token Verification              │
-              │ Authorization                   │
-              │ Input Validation                │
-              │ Gemini Fallback                 │
-              │ Maps Proxy                      │
-              │ Notification Proxy              │
-              └───────┬───────────┬────────────┘
-                      │           │
-             ┌────────▼───┐   ┌───▼────────────┐
-             │ Firestore  │   │ Secret Manager │
-             │ UID scoped │   │ API credentials│
-             └────────────┘   └───────┬────────┘
-                                      │
-                                      ▼
-                               Gemini / Maps
-Another view of Technical Architecture:
-┌────────────────────────────────────────────────────────┐
-│               Frontend (React 18 + Vite)               │
-│   • Tailwind CSS  • Lucide Icons  • Web Audio API      │
-│   • Socratic Voice Engine  • Longitudinal Analytics    │
-│   • D3 Constellation Simulation • Reminder Config      │
-└───────────────────────────▲────────────────────────────┘
-                            │ (Authenticated REST / JSON)
-┌───────────────────────────▼────────────────────────────┐
-│         Backend Proxy Layer (Express / Node.js)        │
-│   • Resilient Gemini AI Fallback Ladder                │
-│   • Zero-Client Notification Proxies (Slack/Discord)   │
-│   • Server Geocoding Proxy  • Audit Log Dispatcher     │
-│   • Automated Socratic Prompt Generator                │
-└───────────────────────────▲────────────────────────────┘
-                            │
-        ┌───────────────────┴───────────────────┐
-        ▼                                       ▼
-┌───────────────────────────────┐   ┌───────────────────────────────┐
-│     Google Gemini AI SDK      │   │   Firebase Auth & Firestore   │
-│  • gemini-3.6-flash (Primary) │   │  • Owner-Bound Path Isolation │
-│  • gemini-3.1-flash-lite      │   │  • Real-Time Synchrony        │
-│  • Socratic Persona System    │   │  • Dynamic RBAC Claims        │
-└───────────────────────────────┘   └───────────────────────────────┘
+                         ┌─────────────────────┐
+                         │       User          │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │ React + Vite        │
+                         │ Web Audio + D3      │
+                         └──────────┬──────────┘
+                                    │
+                          Authenticated REST
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │ Cloud Run           │
+                         │ Express / Node.js   │
+                         │                     │
+                         │ Auth / RBAC         │
+                         │ Validation          │
+                         │ AI orchestration    │
+                         └──────┬──────┬───────┘
+                                │      │
+                 ┌──────────────┘      └──────────────┐
+                 ▼                                    ▼
+        ┌────────────────┐                   ┌────────────────┐
+        │   Firestore    │                   │ Gemini API     │
+        │ UID isolation  │                   │ AI reasoning   │
+        └────────────────┘                   └────────────────┘
+                 │
+                 ▼
+        ┌────────────────┐
+        │ Secret Manager │
+        └────────────────┘
 ```
-## 🚀 Data Model
-Show how Firestore data is organized.
+## 🚀 Logical Data Model
 users/{userId}
+    ├── profile
+    ├── role
+    ├── preferences
+    └── reminders
 
-reflections/{reflectionId}
-    userId
-    createdAt
-    content
-    mood
-    themes
-    cognitivePatterns
-    aiInsight
+users/{userId}/entries/{entryId}
+    ├── reflection
+    ├── mood
+    ├── location
+    ├── AI analysis
+    └── timestamps
 
-goals/{goalId}
-    userId
-    title
-    description
-    createdAt
-    status
+users/{userId}/entries/{entryId}/messages/{messageId}
+    ├── role
+    ├── content
+    └── timestamp
+
+audit_logs/{logId}
+    ├── actor
+    ├── action
+    ├── timestamp
+    └── result
   | Collection      | Purpose               | Key Fields                   |
 | --------------- | --------------------- | ---------------------------- |
 | `users`         | User profile          | userId, preferences          |

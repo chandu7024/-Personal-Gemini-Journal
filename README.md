@@ -199,52 +199,6 @@ service cloud.firestore {
 ```
 
 ---
-## 🏗️ Technical Sequence Diagram
-User Reflection
-      │
-      ▼
-React UI
-      │
-      ▼
-Express API
-      │
-      ├── Authentication
-      ├── Input Validation
-      ├── Context Retrieval
-      │
-      ▼
-Prompt Construction
-      │
-      ├── System Instructions
-      ├── User Reflection
-      ├── Conversation Context
-      └── Historical Context
-      │
-      ▼
-Gemini
-      │
-      ▼
-Response Validation
-      │
-      ├── Valid → Process
-      └── Failure → Fallback / Retry
-      │
-      ▼
-Firestore
-      │
-      ▼
-React Dashboard
-
-| Gemini capability     | Input                  | Output              |
-| --------------------- | ---------------------- | ------------------- |
-| Socratic dialogue     | User reflection        | Follow-up question  |
-| Cognitive analysis    | Reflection             | Patterns + severity |
-| Executive synthesis   | Reflection history     | Summary + themes    |
-| Goal generation       | Insight                | Action steps        |
-| Reminder generation   | User context           | Personalized prompt |
-| Longitudinal analysis | Historical reflections | Trends              |
-
-
 ## 🏗️ Technical Architecture & Stack
 
                          ┌─────────────────────┐
@@ -281,6 +235,57 @@ React Dashboard
         │ Secret Manager │
         └────────────────┘
 ```
+## 🤖 Gemini Processing Architecture
+
+ReflectAI uses Gemini as the reasoning layer for reflection analysis,
+Socratic dialogue, cognitive pattern detection, goal generation,
+and longitudinal synthesis.
+
+```text
+User Reflection
+       │
+       ▼
+React / Vite
+       │
+       ▼
+Express API
+       │
+       ├── Authentication
+       ├── Input Validation
+       └── Context Retrieval
+       │
+       ▼
+Prompt Construction
+       │
+       ├── System Instructions
+       ├── Current Reflection
+       ├── Conversation Context
+       └── Historical Context
+       │
+       ▼
+     Gemini
+       │
+       ▼
+Response Validation
+       │
+       ├── Valid → Process
+       │
+       └── Failure → Fallback
+       │
+       ▼
+   Firestore
+       │
+       ▼
+Insight / Goal / Reflection
+Gemini Responsibilities
+| Capability            | Input                             | Output                        |
+| --------------------- | --------------------------------- | ----------------------------- |
+| Socratic Dialogue     | Current reflection + conversation | Reflective question           |
+| Cognitive Analysis    | Reflection content                | Cognitive patterns + insights |
+| Goal Generation       | Insight + user context            | Actionable goals              |
+| Longitudinal Analysis | Historical reflections            | Trends and recurring themes   |
+| Reminder Synthesis    | User preferences + history        | Personalized prompt           |
+
 ## 🚀 Logical Data Model
 users/{userId}
     ├── profile

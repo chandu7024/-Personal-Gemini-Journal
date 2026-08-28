@@ -58,8 +58,8 @@ ReflectAI goes beyond the baseline Personal Gemini Journal by combining:
 - **Dual-Mode Synchrony**: Spoken interactions automatically synchronize with the active reflection entry in Firestore.
 - **Microphone Safety & Ephemeral Processing**: Ephemeral in-memory audio buffers with zero disk logging; safe audio lifecycle tear-down on unmount.
 
-### 🧠 2. Cognitive Distortion Diagnostic Engine
-- **Clinical Bias Radar**: Automatically identifies 10+ cognitive distortions with severity scoring and confidence indices.
+### 🧠 2. Cognitive Pattern Detection & Reflection Engine
+- **Cognitive Pattern Radar**: Automatically identifies 10+ cognitive distortions with severity scoring and confidence indices.
 - **Empathetic Socratic Reframing**: Formulates objective perspective shifts and actionable micro-practices to overcome identified blind spots.
 - **Multi-Persona Modes**: Adapt reflection style on the fly between **Mindful**, **Socratic Questioner**, **Strategic Brainstorm**, **Gratitude**, and **Action Architect**.
 
@@ -92,7 +92,7 @@ ReflectAI goes beyond the baseline Personal Gemini Journal by combining:
 ### 🛡️ 7. Role-Based Access Control (RBAC) & Audit Console
 - **Role Hierarchy**: Strict separation between `user` (isolated journal access), `admin` (system telemetry & latency analytics), and `super_admin` (role promotion & audit inspection).
 - **Immutable Audit Trail**: Administrative actions and notification events are recorded to an isolated `/audit_logs` collection.
-
+Important: ReflectAI is a reflection and self-awareness tool, not a medical or mental-health diagnostic system. Its AI-generated patterns and suggestions are exploratory and should not be considered professional diagnosis or treatment.
 ---
 
 ## 🛡️ Agentic Threat Model & Security Architecture

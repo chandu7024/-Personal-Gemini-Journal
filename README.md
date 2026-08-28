@@ -199,6 +199,44 @@ service cloud.firestore {
 ```
 
 ---
+## 🏗️ Technical Sequence Diagram
+User
+ │
+ │ Submit reflection
+ ▼
+React UI
+ │
+ │ POST /api/reflections
+ ▼
+Express API
+ │
+ ├── Validate input
+ ├── Authenticate user
+ ├── Sanitize content
+ │
+ ▼
+Gemini Service
+ │
+ │ Prompt + reflection context
+ ▼
+Gemini
+ │
+ │ Structured response
+ ▼
+Gemini Service
+ │
+ ├── Validate response
+ └── Apply fallback/error handling
+ │
+ ▼
+Firestore
+ │
+ └── Store reflection + insight
+ │
+ ▼
+React UI
+ │
+ └── Display insight
 
 ## 🏗️ Technical Architecture & Stack
 
@@ -259,7 +297,38 @@ Another view of Technical Architecture:
 │  • Socratic Persona System    │   │  • Dynamic RBAC Claims        │
 └───────────────────────────────┘   └───────────────────────────────┘
 ```
+## 🚀 Data Model
+Show how Firestore data is organized.
+users/{userId}
 
+reflections/{reflectionId}
+    userId
+    createdAt
+    content
+    mood
+    themes
+    cognitivePatterns
+    aiInsight
+
+goals/{goalId}
+    userId
+    title
+    description
+    createdAt
+    status
+  | Collection      | Purpose               | Key Fields                   |
+| --------------- | --------------------- | ---------------------------- |
+| `users`         | User profile          | userId, preferences          |
+| `reflections`   | Journal entries       | content, timestamp, analysis |
+| `conversations` | Socratic dialogue     | messages, context            |
+| `goals`         | Action tracking       | goal, status, deadline       |
+| `insights`      | Longitudinal insights | patterns, trends             |
+
+
+conversations/{conversationId}
+    userId
+    messages[]
+    createdAt
 ---
 
 ## 🚀 Deployment & Installation Guide
@@ -406,6 +475,14 @@ git push -u origin main --force
 | **TC-14** | **Audit Log Lockdown (Direct Write Prevention)** | Attempt direct client-side write to `/audit_logs/{id}` via Firestore SDK. | Rejected with `PERMISSION_DENIED`. Writes are exclusively handled by trusted server proxy (`/api/audit/log`). |
 | **TC-15** | **RBAC Privilege Escalation Guard** | Standard authenticated user attempts `updateDoc(users/{uid}, { role: "admin" })`. | Rejected with `PERMISSION_DENIED`. Firestore rules block non-super_admin clients from mutating the `role` field. |
 
+## ⚠️ Known Limitations
+
+- AI-generated insights should be treated as reflective guidance,
+  not professional diagnosis.
+- Gemini responses may vary between interactions.
+- Longitudinal insights depend on sufficient historical data.
+- Cloud service availability may affect response latency.
+- Some advanced analytics require a minimum number of reflections.
 ---
 
 ## 👥 Authors & Acknowledgments

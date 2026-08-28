@@ -75,7 +75,7 @@ ReflectAI is engineered following the **5 Threat Zones** and the **OWASP Top 10 
 | **Tool Execution** | Dynamic evaluation risks, privilege escalation, SSRF | OWASP Top 10 A01 / A03 | Strictly typed REST endpoints without `eval()`; server-only dispatch proxies; container ingress restricted to `0.0.0.0:3000`. |
 | **Memory & State** | Cross-tenant journal access, session hijacking | OWASP A01 Broken Access Control | Granular Firestore security rules enforcing `request.auth.uid == userId` for all document read/writes. |
 | **Inter-System Communication** | API token / webhook leakage in frontend bundles | OWASP A02 Cryptographic Failures | Zero client-side credentials. Gemini API keys, Maps server keys, and notification webhooks are retrieved securely via environment variables or Secret Manager. |
-
+> ⚠️ SECURITY: Never commit `.env`, API keys, service-account JSON files, access tokens, webhook URLs, or other credentials to GitHub. The `.env` file is for local development only. Production Cloud Run deployments retrieve sensitive credentials through Google Cloud Secret Manager.
 ---
 
 ## 🔒 Cloud Firestore Security Rules

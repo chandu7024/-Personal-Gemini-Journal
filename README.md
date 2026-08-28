@@ -12,53 +12,44 @@
 ---
 
 ## 🌟 Executive Summary
+# 🌟 ReflectAI — Multi-Modal Socratic Journal & Cognitive Reflection Engine
+
 ## 🎯 Why ReflectAI?
 
-Most AI assistants answer questions.s
+Most AI assistants answer questions.
 
 Most journaling applications store thoughts.
 
-ReflectAI connects reflection with action.
+**ReflectAI connects reflection with action.**
 
 A user's private reflection becomes:
 
 **Reflection → Conversation → Insight → Goal → Action → Longitudinal Growth**
 
-The application combines Gemini's conversational capabilities with a secure
-Cloud Run + Firebase architecture so that each user's journal remains isolated.
+ReflectAI is a cloud-native, multi-modal AI reflection companion that combines
+Gemini-powered Socratic conversations, voice journaling, cognitive pattern
+analysis, longitudinal reflection analytics, semantic theme discovery,
+location-aware journaling, and reflection-to-action workflows.
 
-The result is a personal AI reflection companion rather than a generic chatbot.
-**ReflectAI** is not a passive digital diary or generic chatbot wrapper. It is a cloud-native, multi-modal **Socratic Mirror and Cognitive Growth Platform** grounded in clinical Cognitive Behavioral Therapy (CBT) principles. 
-
-ReflectAI actively parses user reflections to detect cognitive distortions (such as *Catastrophizing*, *All-or-Nothing Thinking*, *Mind Reading*, and *Imposter Phenomenon*), challenges underlying assumptions through real-time **voice & text Socratic dialogue**, tracks **longitudinal psychological vitality**, maps recurring mental themes on a **Subconscious Semantic Constellation**, and translates unstructured self-talk into clear executive action steps—all wrapped within an enterprise-grade, zero-trust security architecture.
+Unlike a generic chatbot, ReflectAI is designed around a user's private,
+authenticated reflection history and provides a secure architecture using
+Firebase Authentication, Cloud Firestore, Cloud Run, and Google Cloud
+Secret Manager.
 
 ---
+
 ## 🏆 What Makes ReflectAI Different?
 
 ReflectAI goes beyond the baseline Personal Gemini Journal by combining:
 
-### 🧠 Socratic Voice Reflection
-Natural voice-based reflective conversations.
-
-### 🌌 Semantic Constellation
-Connects recurring themes and "echoes" across a user's reflections.
-
-### 📈 Longitudinal Growth
-Tracks reflection patterns across time rather than analyzing one entry in isolation.
-
-### 🎯 Reflection-to-Action
-Transforms insights into actionable goals and behavioral experiments.
-
-### 📍 Contextual Memory
-Optionally associates reflections with meaningful locations.
-
-### 🔐 Security-by-Design
-Firebase authentication, UID-scoped Firestore authorization,
-Cloud Run backend isolation, Secret Manager and RBAC.
-
-### 🛡️ AI Threat Modeling
-Security requirements are embedded into the Google AI Studio Custom Instructions
-used during application development.
+- 🧠 **Socratic Voice Reflection** — natural voice-based reflective conversations
+- 🌌 **Semantic Constellation** — connects recurring themes and echoes across reflections
+- 📈 **Longitudinal Growth** — identifies reflection patterns over time
+- 🎯 **Reflection-to-Action** — converts insights into goals and actionable steps
+- 📍 **Contextual Memory** — optionally associates reflections with meaningful locations
+- 🔔 **Multi-Channel Reminders** — personalized reflection prompts and notifications
+- 🛡️ **Security-by-Design** — Firebase Auth, Firestore isolation, RBAC and Secret Manager
+- 🔐 **AI Threat Modeling** — security requirements embedded into Google AI Studio Custom Instructions
 ## 🚀 Key Feature Matrix
 
 ### 🎙️ 1. Real-Time Socratic Voice Journaling

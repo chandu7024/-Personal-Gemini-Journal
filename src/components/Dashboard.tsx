@@ -7,6 +7,7 @@ import { InsightsDrawer } from "./InsightsDrawer";
 import { ThreatModelModal } from "./ThreatModelModal";
 import { AdminDashboardModal } from "./AdminDashboardModal";
 import { CognitiveAnalyticsHub } from "./CognitiveAnalyticsHub";
+import { SocraticVoiceModal } from "./SocraticVoiceModal";
 import {
   subscribeToUserEntries,
   subscribeToEntryMessages,
@@ -20,7 +21,7 @@ import {
 } from "../lib/firebase";
 import { sendChatMessage, summarizeJournalEntry, analyzeCognitiveBiases } from "../lib/geminiApi";
 import type { JournalEntry, JournalMessage, ReflectionMode, EntryLocation, UserRole } from "../types";
-import { Loader2, Plus, Sparkles, BookOpen } from "lucide-react";
+import { Loader2, Plus, Sparkles, BookOpen, Mic } from "lucide-react";
 
 interface DashboardProps {
   user: User;
@@ -43,6 +44,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const [isThreatModalOpen, setIsThreatModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
 
   // Subscribe to user profile to monitor role in real-time
   useEffect(() => {
@@ -336,6 +338,63 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     }
   };
 
+  // Handler: Real-time Spoken Voice Turn Persistence (Firestore user isolation)
+  const handleSaveSpokenTurn = async (userText: string, aiText: string) => {
+    if (!user.uid) return;
+
+    let targetEntryId = activeEntryId;
+
+    // If no active entry exists, auto-scaffold one
+    if (!targetEntryId) {
+      const newId = await createJournalEntry(
+        user.uid,
+        "Voice Reflection Session",
+        "socratic",
+        ["voice", "socratic", "live-audio"]
+      );
+      targetEntryId = newId;
+      setActiveEntryId(newId);
+    }
+
+    // Save user spoken prompt
+    await saveJournalMessage(user.uid, targetEntryId, {
+      role: "user",
+      content: userText,
+    });
+
+    // Save Gemini Socratic spoken inquiry
+    await saveJournalMessage(user.uid, targetEntryId, {
+      role: "assistant",
+      content: aiText,
+      modelUsed: "gemini-3.6-flash",
+    });
+
+    // Update snippet
+    await updateJournalEntry(user.uid, targetEntryId, {
+      snippet: userText.slice(0, 140),
+    });
+  };
+
+  // Handler: Create a full entry from standalone voice session
+  const handleNewVoiceEntry = async (fullSpokenTranscript: string): Promise<string> => {
+    if (!user.uid) return "";
+    const newId = await createJournalEntry(
+      user.uid,
+      `Voice Socratic Dialogue (${new Date().toLocaleDateString([], { month: "short", day: "numeric" })})`,
+      "socratic",
+      ["voice", "socratic"]
+    );
+
+    // Save initial prompt
+    await saveJournalMessage(user.uid, newId, {
+      role: "user",
+      content: fullSpokenTranscript,
+    });
+
+    setActiveEntryId(newId);
+    return newId;
+  };
+
   return (
     <div className="min-h-screen bg-slate-100/75 dark:bg-[#0b0f17] flex flex-col antialiased">
       {/* Top Navigation */}
@@ -344,6 +403,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         userRole={userRole}
         onSignOut={onSignOut}
         onNewEntry={handleNewEntry}
+        onOpenVoiceJournal={() => setIsVoiceModalOpen(true)}
         onOpenThreatModel={() => setIsThreatModalOpen(true)}
         onOpenAdminConsole={() => setIsAdminModalOpen(true)}
         onOpenAnalytics={() => setIsAnalyticsModalOpen(true)}
@@ -359,6 +419,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           activeEntryId={activeEntryId}
           onSelectEntry={(id) => setActiveEntryId(id)}
           onNewEntry={handleNewEntry}
+          onOpenVoiceJournal={() => setIsVoiceModalOpen(true)}
           onDeleteEntry={handleDeleteEntry}
           onTogglePin={handleTogglePin}
           isOpen={isSidebarOpen}
@@ -383,16 +444,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
               Your Private Journal is Ready
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mb-6 leading-relaxed">
-              Create your first journal entry to start a multi-turn reflective dialogue with Gemini. All reflections are strictly encrypted and isolated in Firestore.
+              Create your first journal entry or launch live voice reflections with Gemini. All data is strictly encrypted and isolated in Firestore.
             </p>
-            <button
-              id="btn-create-first-reflection"
-              onClick={handleNewEntry}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create First Reflection</span>
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                id="btn-create-first-reflection"
+                onClick={handleNewEntry}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create Text Reflection</span>
+              </button>
+
+              <button
+                id="btn-create-first-voice"
+                onClick={() => setIsVoiceModalOpen(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-xs transition-colors cursor-pointer"
+              >
+                <Mic className="w-4 h-4" />
+                <span>Launch Voice Journal</span>
+              </button>
+            </div>
           </div>
         ) : activeEntry ? (
           <EntryWorkspace
@@ -405,6 +477,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
             onAddTag={handleAddTag}
             onRemoveTag={handleRemoveTag}
             onUpdateLocation={handleUpdateLocation}
+            onOpenVoiceJournal={() => setIsVoiceModalOpen(true)}
             isInsightsOpen={isInsightsOpen}
             onToggleInsights={() => setIsInsightsOpen((prev) => !prev)}
           />
@@ -428,6 +501,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           />
         )}
       </div>
+
+      {/* Socratic Voice Journaling Modal */}
+      <SocraticVoiceModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        activeEntry={activeEntry}
+        onSaveSpokenTurn={handleSaveSpokenTurn}
+        onNewVoiceEntry={handleNewVoiceEntry}
+      />
 
       {/* Threat Model Modal */}
       <ThreatModelModal

@@ -20,6 +20,7 @@ import {
   Brain,
   MessageSquare,
   X,
+  Mic,
 } from "lucide-react";
 import type { JournalEntry, JournalMessage, ReflectionMode, EntryLocation } from "../types";
 import { LocationPickerModal } from "./LocationPickerModal";
@@ -34,6 +35,7 @@ interface EntryWorkspaceProps {
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onUpdateLocation?: (location: EntryLocation | null) => void;
+  onOpenVoiceJournal?: () => void;
   isInsightsOpen: boolean;
   onToggleInsights: () => void;
 }
@@ -84,6 +86,7 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
   onAddTag,
   onRemoveTag,
   onUpdateLocation,
+  onOpenVoiceJournal,
   isInsightsOpen,
   onToggleInsights,
 }) => {
@@ -219,6 +222,18 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {onOpenVoiceJournal && (
+              <button
+                id="btn-workspace-voice-socratic"
+                onClick={onOpenVoiceJournal}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800 hover:bg-purple-100 transition-all cursor-pointer shadow-2xs"
+                title="Launch Live Socratic Voice Dialogue for this reflection"
+              >
+                <Mic className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 animate-pulse" />
+                <span className="hidden sm:inline">Voice Socratic</span>
+              </button>
+            )}
+
             {entry.cognitiveAnalysis && entry.cognitiveAnalysis.biasesDetected.length > 0 && (
               <button
                 onClick={onToggleInsights}
@@ -547,6 +562,19 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
             </span>
 
             <div className="flex items-center gap-2">
+              {onOpenVoiceJournal && (
+                <button
+                  id="btn-input-voice-socratic"
+                  type="button"
+                  onClick={onOpenVoiceJournal}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-800 transition-colors cursor-pointer"
+                  title="Speak via Socratic Voice Journal"
+                >
+                  <Mic className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                  <span className="hidden sm:inline">Voice</span>
+                </button>
+              )}
+
               <button
                 id="btn-send-message"
                 onClick={handleSend}

@@ -15,10 +15,12 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Model Fallback Ladder configuration (prioritizing current high-quota models)
 const MODEL_FALLBACK_LADDER = [
-  "gemini-3.7-flash",
-  "gemini-flash-latest",
-  "gemini-3.1-flash-lite",
   "gemini-3.6-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-flash-latest",
+  "gemini-3.7-flash",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
 ];
 
 // Track 429 / quota exhaustion cooldown timestamps per model
@@ -45,7 +47,7 @@ function getGenAiClient(): GoogleGenAI {
 }
 
 /**
- * Helper to parse retry delay from 429 error object or default to 60s
+ * Helper to parse retry delay from 429 error object or default to short 10s cooldown
  */
 function parseRetryDelayMs(err: any): number {
   try {
@@ -54,13 +56,13 @@ function parseRetryDelayMs(err: any): number {
     if (retryMatch && retryMatch[1]) {
       const seconds = parseFloat(retryMatch[1]);
       if (!isNaN(seconds) && seconds > 0) {
-        return Math.ceil(seconds * 1000) + 1000; // Add 1s safety buffer
+        return Math.min(Math.ceil(seconds * 1000) + 500, 15000); // Cap at 15s max
       }
     }
   } catch {
     // ignore
   }
-  return 60000; // Default 60 seconds cooldown
+  return 10000; // Default short 10 seconds cooldown
 }
 
 /**
@@ -81,7 +83,7 @@ async function generateContentWithFallback(params: {
     return !cooldown || now > cooldown;
   });
 
-  // If all models are currently in cooldown, try all models anyway as fallback
+  // If all models are currently in cooldown, clear cooldowns and try all models anyway
   const modelsToAttempt = availableModels.length > 0 ? availableModels : MODEL_FALLBACK_LADDER;
 
   for (const model of modelsToAttempt) {
@@ -102,12 +104,15 @@ async function generateContentWithFallback(params: {
       return { text: responseText, modelUsed: model };
     } catch (err: any) {
       lastError = err;
-      const status = err?.status || err?.statusCode || (err?.message?.includes("429") || err?.message?.includes("RESOURCE_EXHAUSTED") ? 429 : 500);
+      const status = err?.status || err?.statusCode || (err?.message?.includes("429") || err?.message?.includes("RESOURCE_EXHAUSTED") ? 429 : (err?.message?.includes("503") || err?.message?.includes("UNAVAILABLE")) ? 503 : 500);
       
       if (status === 429 || String(err?.message || "").includes("RESOURCE_EXHAUSTED")) {
         const cooldownMs = parseRetryDelayMs(err);
         modelCooldownUntil[model] = Date.now() + cooldownMs;
         console.warn(`[Gemini API] Model ${model} rate-limited (429). Cooldown set for ${Math.round(cooldownMs / 1000)}s. Attempting next fallback...`);
+      } else if (status === 503 || String(err?.message || "").includes("UNAVAILABLE") || String(err?.message || "").includes("high demand")) {
+        modelCooldownUntil[model] = Date.now() + 10000;
+        console.warn(`[Gemini API] Model ${model} high demand (503). Attempting next fallback...`);
       } else {
         console.warn(`[Gemini API] Model ${model} encountered error (${status}): ${err?.message || err}. Attempting next fallback...`);
       }
@@ -185,6 +190,108 @@ app.post("/api/chat", async (req, res) => {
     console.error("[API Error] /api/chat failure:", error);
     return res.status(500).json({
       error: error?.message || "Failed to generate reflection response from Gemini.",
+      success: false,
+    });
+  }
+});
+
+// Alias for /api/ai/socratic-turn to prevent 404s
+app.post("/api/ai/socratic-turn", async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const { messages, prompt, mode = "socratic", systemInstruction: customInstruction, location } = body;
+
+    let history = Array.isArray(messages) ? [...messages] : [];
+    if (prompt && typeof prompt === "string" && (!history.length || history[history.length - 1]?.content !== prompt)) {
+      history.push({ role: "user", content: prompt });
+    }
+
+    if (history.length === 0) {
+      return res.status(400).json({ error: "Missing messages or prompt payload.", success: false });
+    }
+
+    const formattedContents = history.map((msg: any) => ({
+      role: msg.role === "assistant" || msg.role === "model" ? "model" : "user",
+      parts: [{ text: typeof msg.content === "string" ? msg.content.trim() : "" }],
+    }));
+
+    const finalSystemInstruction = `You are ReflectAI's Real-time Socratic Facilitator.
+Help the user explore thoughts deeply, question assumptions gently, and discover inner wisdom.
+Keep responses concise, conversational, and contemplative (1-3 sentences) suitable for reflective pacing.
+${customInstruction ? `\n\nContext: ${customInstruction}` : ""}`;
+
+    const result = await generateContentWithFallback({
+      contents: formattedContents,
+      systemInstruction: finalSystemInstruction,
+      temperature: 0.65,
+    });
+
+    return res.json({
+      success: true,
+      text: result.text,
+      modelUsed: result.modelUsed,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error("[API Error] /api/ai/socratic-turn failure:", error);
+    return res.status(500).json({
+      error: error?.message || "Failed to process Socratic turn.",
+      success: false,
+    });
+  }
+});
+
+// Real-Time Socratic Voice Journaling Endpoint
+app.post("/api/audio/socratic-turn", async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const { transcript, history = [], tone = "socratic", mood } = body;
+
+    if (!transcript || typeof transcript !== "string" || !transcript.trim()) {
+      return res.status(400).json({ error: "Missing 'transcript' payload for voice journaling.", success: false });
+    }
+
+    const formattedContents: any[] = Array.isArray(history)
+      ? history.map((h: any) => ({
+          role: h.role === "assistant" || h.role === "model" ? "model" : "user",
+          parts: [{ text: String(h.content || "").slice(0, 1000) }],
+        }))
+      : [];
+
+    // Add current spoken transcript
+    formattedContents.push({
+      role: "user",
+      parts: [{ text: transcript.trim() }],
+    });
+
+    const voicePromptInstruction = `You are ReflectAI, an executive Socratic voice guide conducting a live spoken reflection session.
+Guidelines for spoken output:
+1. Speak with warmth, calm curiosity, and emotional presence.
+2. Keep your response strictly under 2 to 3 concise spoken sentences (30-50 words maximum).
+3. First briefly validate the user's emotional state or insight (${mood ? `current mood: ${mood}` : "grounded reflection"}).
+4. Then pose one deep, high-agency Socratic question that cuts to root assumptions or invites constructive reframing.
+5. Do NOT use bullet points, bold tags, or markdown, as this text is spoken aloud directly by speech synthesis.`;
+
+    const result = await generateContentWithFallback({
+      contents: formattedContents,
+      systemInstruction: voicePromptInstruction,
+      temperature: 0.6,
+    });
+
+    // Clean any markdown formatting for seamless audio synthesis
+    const spokenText = result.text.replace(/[*_#`~]/g, "").trim();
+
+    return res.json({
+      success: true,
+      text: spokenText,
+      spokenText: spokenText,
+      modelUsed: result.modelUsed,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error("[API Error] /api/audio/socratic-turn failure:", error);
+    return res.status(500).json({
+      error: error?.message || "Failed to process voice reflection turn.",
       success: false,
     });
   }
@@ -1056,6 +1163,22 @@ Respond with ONLY a clean, valid JSON object strictly matching this schema (no m
   }
 });
 
+// Explicit API 404 Catch-All to prevent HTML SPA fallback for API calls
+app.all("/api/*", (req, res) => {
+  res.status(404).json({
+    error: `API endpoint not found: ${req.method} ${req.path}`,
+    success: false,
+  });
+});
+
+// Express API Error Boundary
+app.use("/api", (err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("[API Unhandled Error]:", err);
+  res.status(err.status || 500).json({
+    error: err.message || "Internal server error",
+    success: false,
+  });
+});
 
 // Vite & Static Asset Handling
 async function start() {

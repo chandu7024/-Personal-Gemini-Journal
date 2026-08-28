@@ -37,6 +37,57 @@ export interface InstantReframeResponse {
   error?: string;
 }
 
+export interface VoiceSocraticTurnResponse {
+  success: boolean;
+  text: string;
+  spokenText?: string;
+  modelUsed?: string;
+  error?: string;
+}
+
+/**
+ * Robust fetch wrapper that guarantees safe JSON handling and protects against HTML responses
+ */
+async function safeApiPost<T>(url: string, payload: any, defaultErrorMessage: string): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (netErr: any) {
+    throw new Error(`Network connection error: ${netErr?.message || "Failed to reach server"}`);
+  }
+
+  const rawText = await response.text();
+  let parsedJson: any = null;
+
+  if (rawText && (rawText.trim().startsWith("{") || rawText.trim().startsWith("["))) {
+    try {
+      parsedJson = JSON.parse(rawText);
+    } catch {
+      parsedJson = null;
+    }
+  }
+
+  if (!response.ok) {
+    const errorMsg =
+      parsedJson?.error ||
+      (rawText.length > 0 && rawText.length < 150 && !rawText.includes("<") ? rawText : `${defaultErrorMessage} (HTTP ${response.status})`);
+    throw new Error(errorMsg);
+  }
+
+  if (!parsedJson) {
+    throw new Error(`${defaultErrorMessage}: Unexpected non-JSON server response.`);
+  }
+
+  return parsedJson as T;
+}
+
 /**
  * Send multi-turn reflections/prompts to Gemini backend API
  */
@@ -51,25 +102,43 @@ export async function sendChatMessage(params: {
     content: sanitizeInput(m.content),
   }));
 
-  const response = await fetch("/api/chat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  return safeApiPost<ChatResponse>(
+    "/api/chat",
+    {
       messages: sanitizedMessages,
       mode: params.mode,
       systemInstruction: params.systemInstruction,
       location: params.location,
-    }),
-  });
+    },
+    "Failed to generate reflection response"
+  );
+}
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Server responded with status ${response.status}`);
-  }
+/**
+ * Request real-time Socratic voice dialogue turn
+ */
+export async function sendVoiceSocraticTurn(params: {
+  transcript: string;
+  history?: Array<{ role: string; content: string }>;
+  tone?: string;
+  mood?: string;
+}): Promise<VoiceSocraticTurnResponse> {
+  const sanitizedTranscript = sanitizeInput(params.transcript);
+  const sanitizedHistory = (params.history || []).map((h) => ({
+    role: h.role,
+    content: sanitizeInput(h.content),
+  }));
 
-  return response.json();
+  return safeApiPost<VoiceSocraticTurnResponse>(
+    "/api/audio/socratic-turn",
+    {
+      transcript: sanitizedTranscript,
+      history: sanitizedHistory,
+      tone: params.tone || "socratic",
+      mood: params.mood,
+    },
+    "Failed to process voice reflection turn"
+  );
 }
 
 /**
@@ -84,23 +153,14 @@ export async function summarizeJournalEntry(params: {
     content: sanitizeInput(m.content),
   }));
 
-  const response = await fetch("/api/summarize", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  return safeApiPost<SummarizeResponse>(
+    "/api/summarize",
+    {
       messages: sanitizedMessages,
       title: params.title,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Server responded with status ${response.status}`);
-  }
-
-  return response.json();
+    },
+    "Failed to generate journal summary"
+  );
 }
 
 /**
@@ -116,24 +176,15 @@ export async function analyzeCognitiveBiases(params: {
     content: sanitizeInput(m.content),
   }));
 
-  const response = await fetch("/api/cognitive-analysis", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  return safeApiPost<CognitiveAnalysisResponse>(
+    "/api/cognitive-analysis",
+    {
       messages: sanitizedMessages,
       text: params.text ? sanitizeInput(params.text) : undefined,
       title: params.title ? sanitizeInput(params.title) : undefined,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Server responded with status ${response.status}`);
-  }
-
-  return response.json();
+    },
+    "Failed to diagnose cognitive patterns"
+  );
 }
 
 /**
@@ -142,22 +193,13 @@ export async function analyzeCognitiveBiases(params: {
 export async function reframeSingleThought(thoughtText: string): Promise<InstantReframeResponse> {
   const sanitizedText = sanitizeInput(thoughtText);
 
-  const response = await fetch("/api/cognitive-analysis/reframe-thought", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  return safeApiPost<InstantReframeResponse>(
+    "/api/cognitive-analysis/reframe-thought",
+    {
       thoughtText: sanitizedText,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Server responded with status ${response.status}`);
-  }
-
-  return response.json();
+    },
+    "Failed to generate cognitive reframe"
+  );
 }
 
 /**
@@ -198,22 +240,13 @@ export async function requestLongitudinalAudit(params: {
       : null,
   }));
 
-  const response = await fetch("/api/analytics/longitudinal-audit", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  return safeApiPost<{ success: boolean; audit: LongitudinalAuditResult }>(
+    "/api/analytics/longitudinal-audit",
+    {
       timeRange: params.timeRange,
       entries: sanitizedEntries,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Server responded with status ${response.status}`);
-  }
-
-  return response.json();
+    },
+    "Failed to perform longitudinal audit"
+  );
 }
 

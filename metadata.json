@@ -1,8 +1,9 @@
 {
   "name": "ReflectAI - Journal & Reflection Assistant",
-  "description": "User-authenticated personal journaling and multi-turn reflection workspace powered by Gemini 3.6 Flash and user-isolated Firestore storage.",
+  "description": "User-authenticated personal journaling, cognitive bias diagnostics, and real-time Socratic voice journaling powered by Gemini 3.6 Flash and Firestore.",
   "requestFramePermissions": [
-    "geolocation"
+    "geolocation",
+    "microphone"
   ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

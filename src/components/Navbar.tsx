@@ -10,6 +10,8 @@ import {
   ShieldAlert,
   Brain,
   TrendingUp,
+  Mic,
+  Radio,
 } from "lucide-react";
 import type { User } from "firebase/auth";
 import type { UserRole } from "../types";
@@ -19,6 +21,7 @@ interface NavbarProps {
   userRole?: UserRole;
   onSignOut: () => void;
   onNewEntry: () => void;
+  onOpenVoiceJournal?: () => void;
   onOpenThreatModel: () => void;
   onOpenAdminConsole?: () => void;
   onOpenAnalytics?: () => void;
@@ -31,6 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   userRole = "user",
   onSignOut,
   onNewEntry,
+  onOpenVoiceJournal,
   onOpenThreatModel,
   onOpenAdminConsole,
   onOpenAnalytics,
@@ -78,6 +82,18 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Right section: Action Buttons & User Profile */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {onOpenVoiceJournal && (
+          <button
+            id="btn-voice-journal-nav"
+            onClick={onOpenVoiceJournal}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg shadow-xs transition-all cursor-pointer ring-1 ring-purple-500/30 hover:shadow-sm"
+            title="Launch Real-Time Socratic Voice Journaling"
+          >
+            <Mic className="w-4 h-4 text-purple-200 animate-pulse" />
+            <span>Voice Journal</span>
+          </button>
+        )}
+
         <button
           id="btn-new-reflection-nav"
           onClick={onNewEntry}

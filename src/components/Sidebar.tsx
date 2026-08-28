@@ -12,6 +12,7 @@ import {
   BookOpen,
   Filter,
   Check,
+  Mic,
 } from "lucide-react";
 import type { JournalEntry, ReflectionMode } from "../types";
 
@@ -20,6 +21,7 @@ interface SidebarProps {
   activeEntryId: string | null;
   onSelectEntry: (entryId: string) => void;
   onNewEntry: () => void;
+  onOpenVoiceJournal?: () => void;
   onDeleteEntry: (entryId: string) => void;
   onTogglePin: (entryId: string, currentPin: boolean) => void;
   isOpen: boolean;
@@ -38,6 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeEntryId,
   onSelectEntry,
   onNewEntry,
+  onOpenVoiceJournal,
   onDeleteEntry,
   onTogglePin,
   isOpen,
@@ -94,14 +97,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           </div>
 
-          <button
-            id="btn-sidebar-new-entry"
-            onClick={onNewEntry}
-            className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer border border-indigo-200/60 dark:border-indigo-800/60 shadow-2xs"
-            title="Start New Reflection"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {onOpenVoiceJournal && (
+              <button
+                id="btn-sidebar-voice-entry"
+                onClick={onOpenVoiceJournal}
+                className="p-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900 text-purple-700 dark:text-purple-300 transition-colors cursor-pointer border border-purple-200/60 dark:border-purple-800/60 shadow-2xs"
+                title="Launch Socratic Voice Journal"
+              >
+                <Mic className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              </button>
+            )}
+
+            <button
+              id="btn-sidebar-new-entry"
+              onClick={onNewEntry}
+              className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer border border-indigo-200/60 dark:border-indigo-800/60 shadow-2xs"
+              title="Start New Reflection"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Search Input */}

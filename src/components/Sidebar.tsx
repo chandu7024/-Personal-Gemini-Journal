@@ -14,11 +14,18 @@ import {
   Check,
   Mic,
 } from "lucide-react";
-import type { JournalEntry, ReflectionMode } from "../types";
+import type { JournalEntry, ReflectionMode, UserProfile, UserRole } from "../types";
+import type { User } from "firebase/auth";
+import { User as UserIcon, ShieldCheck } from "lucide-react";
+import { formatDisplayDate, safeGetTime } from "../lib/dateUtils";
 
 interface SidebarProps {
   entries: JournalEntry[];
   activeEntryId: string | null;
+  user?: User | null;
+  userProfile?: UserProfile | null;
+  userRole?: UserRole;
+  onOpenProfile?: () => void;
   onSelectEntry: (entryId: string) => void;
   onNewEntry: () => void;
   onOpenVoiceJournal?: () => void;
@@ -38,6 +45,10 @@ const MODE_LABELS: Record<ReflectionMode, { label: string; color: string }> = {
 export const Sidebar: React.FC<SidebarProps> = ({
   entries,
   activeEntryId,
+  user,
+  userProfile,
+  userRole = "user",
+  onOpenProfile,
   onSelectEntry,
   onNewEntry,
   onOpenVoiceJournal,
@@ -48,6 +59,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
+
+  const displayName =
+    userProfile?.displayName ||
+    user?.displayName ||
+    (user?.email ? user.email.split("@")[0] : "Executive User");
+  const isAdmin = userRole === "admin" || userRole === "super_admin";
 
   // Extract all unique tags
   const allTags = Array.from(new Set(entries.flatMap((e) => e.tags || [])));
@@ -65,17 +82,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const sortedEntries = [...filteredEntries].sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    return safeGetTime(b.updatedAt) - safeGetTime(a.updatedAt);
   });
-
-  const formatDate = (isoString: string) => {
-    try {
-      const d = new Date(isoString);
-      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    } catch {
-      return "Recent";
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -213,7 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
 
                   <span className="text-[10px] text-slate-400 shrink-0 font-medium">
-                    {formatDate(entry.updatedAt)}
+                    {formatDisplayDate(entry.updatedAt)}
                   </span>
                 </div>
 
@@ -270,6 +278,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })
         )}
       </div>
+
+      {/* User Identity Footer Card */}
+      {user && (
+        <div className="p-3 border-t border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs">
+          <button
+            id="btn-sidebar-user-profile"
+            onClick={onOpenProfile}
+            className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer text-left border border-slate-200/60 dark:border-slate-800/80 shadow-2xs group"
+            title="View & Edit User Profile"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt={displayName}
+                  className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 object-cover shadow-2xs shrink-0 ring-1 ring-indigo-500/20"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-slate-800 text-white text-xs font-bold shrink-0 shadow-2xs ring-1 ring-indigo-500/20">
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
+
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    {displayName}
+                  </span>
+                  <span
+                    className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider ${
+                      isAdmin
+                        ? "bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800"
+                        : "bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                    }`}
+                  >
+                    {userRole}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 truncate">
+                  {user.email || "Active User"}
+                </span>
+              </div>
+            </div>
+
+            <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1">
+              Edit
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       {entryToDelete && (

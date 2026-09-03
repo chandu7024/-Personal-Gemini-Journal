@@ -27,6 +27,7 @@ import type {
   VitalityTrendDataPoint,
 } from "../types";
 import { requestLongitudinalAudit } from "../lib/geminiApi";
+import { formatDisplayDate, safeGetTime } from "../lib/dateUtils";
 
 interface CognitiveAnalyticsHubProps {
   isOpen: boolean;
@@ -53,7 +54,7 @@ export const CognitiveAnalyticsHub: React.FC<CognitiveAnalyticsHubProps> = ({
   const filteredEntries = useMemo(() => {
     const now = new Date().getTime();
     return entries.filter((e) => {
-      const entryTime = new Date(e.createdAt).getTime();
+      const entryTime = safeGetTime(e.createdAt);
       if (isNaN(entryTime)) return true;
       if (timeWindow === "7d") return now - entryTime <= 7 * 24 * 60 * 60 * 1000;
       if (timeWindow === "30d") return now - entryTime <= 30 * 24 * 60 * 60 * 1000;
@@ -110,9 +111,9 @@ export const CognitiveAnalyticsHub: React.FC<CognitiveAnalyticsHubProps> = ({
   const timelineSeries: VitalityTrendDataPoint[] = useMemo(() => {
     return filteredEntries
       .filter((e) => e.createdAt)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .sort((a, b) => safeGetTime(a.createdAt) - safeGetTime(b.createdAt))
       .map((e) => {
-        const dateStr = new Date(e.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        const dateStr = formatDisplayDate(e.createdAt);
         return {
           id: e.id,
           date: dateStr,

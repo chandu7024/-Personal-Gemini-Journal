@@ -16,14 +16,16 @@ import {
   Bell,
 } from "lucide-react";
 import type { User } from "firebase/auth";
-import type { UserRole, EmailReminderSettings } from "../types";
+import type { UserRole, EmailReminderSettings, UserProfile } from "../types";
 
 interface NavbarProps {
   user: User | null;
+  userProfile?: UserProfile | null;
   userRole?: UserRole;
   reminderSettings?: EmailReminderSettings | null;
   onSignOut: () => void;
   onNewEntry: () => void;
+  onOpenProfile?: () => void;
   onOpenVoiceJournal?: () => void;
   onOpenConstellation?: () => void;
   onOpenReminders?: () => void;
@@ -36,10 +38,12 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   user,
+  userProfile,
   userRole = "user",
   reminderSettings,
   onSignOut,
   onNewEntry,
+  onOpenProfile,
   onOpenVoiceJournal,
   onOpenConstellation,
   onOpenReminders,
@@ -51,6 +55,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const isAdmin = userRole === "admin" || userRole === "super_admin";
   const isReminderActive = reminderSettings?.enabled;
+
+  const displayName =
+    userProfile?.displayName ||
+    user?.displayName ||
+    (user?.email ? user.email.split("@")[0] : "Executive User");
 
   return (
     <header
@@ -188,31 +197,49 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {user && (
           <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800 shrink-0">
-            {user.photoURL ? (
-              <img
-                id="user-avatar-img"
-                src={user.photoURL}
-                alt={user.displayName || "User"}
-                className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 object-cover shadow-2xs shrink-0"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div
-                id="user-avatar-placeholder"
-                className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold shrink-0"
-              >
-                {user.displayName?.charAt(0) || user.email?.charAt(0) || "U"}
-              </div>
-            )}
+            <button
+              id="btn-user-profile-nav"
+              onClick={onOpenProfile}
+              className="flex items-center gap-2 p-1 sm:px-2.5 sm:py-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700 text-left group"
+              title="Click to view & edit your User Profile"
+            >
+              {user.photoURL ? (
+                <img
+                  id="user-avatar-img"
+                  src={user.photoURL}
+                  alt={displayName}
+                  className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 object-cover shadow-2xs shrink-0 ring-1 ring-indigo-500/20"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div
+                  id="user-avatar-placeholder"
+                  className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-slate-800 text-white text-xs font-bold shrink-0 shadow-2xs ring-1 ring-indigo-500/20"
+                >
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
 
-            <div className="hidden lg:flex flex-col text-left">
-              <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate max-w-[120px]">
-                {user.displayName || "Executive User"}
-              </span>
-              <span className="text-[10px] text-slate-400 truncate max-w-[120px]">
-                {user.email || "Authenticated"}
-              </span>
-            </div>
+              <div className="flex flex-col text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate max-w-[90px] sm:max-w-[130px] group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    {displayName}
+                  </span>
+                  <span
+                    className={`hidden sm:inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider ${
+                      isAdmin
+                        ? "bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                    }`}
+                  >
+                    {userRole}
+                  </span>
+                </div>
+                <span className="hidden md:block text-[10px] text-slate-400 truncate max-w-[130px]">
+                  {user.email || "Authenticated"}
+                </span>
+              </div>
+            </button>
 
             <button
               id="btn-sign-out"

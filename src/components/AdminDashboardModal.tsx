@@ -91,7 +91,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       action: "MODEL_LADDER_HEALTHCHECK",
       actorEmail: "system",
       actorUid: "cloud-run-daemon",
-      targetResource: "gemini-3.6-flash",
+      targetResource: "gemini-3.7-flash",
       status: "success",
       details: "Active model responsive. Fallback ladder ready.",
       timestamp: new Date(Date.now() - 600000).toLocaleTimeString(),
@@ -402,10 +402,10 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                     <Server className="w-4 h-4 text-indigo-500" />
                   </div>
                   <div className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                    gemini-3.6-flash
+                    gemini-3.1-flash-lite
                   </div>
                   <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
-                    ● Fallback ladder primed (3.1 Lite & 3.7 Flash)
+                    ● Fallback ladder primed (3.7 Flash & 3.8 Flash)
                   </div>
                 </div>
 
@@ -443,23 +443,23 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
                   <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800">
                     <span className="text-[10px] font-bold text-indigo-600 uppercase">Primary</span>
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">gemini-3.6-flash</p>
-                    <p className="text-[10px] text-slate-400">High speed, default</p>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">gemini-3.1-flash-lite</p>
+                    <p className="text-[10px] text-slate-400">High availability, ~1s latency</p>
                   </div>
                   <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                     <span className="text-[10px] font-bold text-purple-600 uppercase">Stage 2</span>
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">gemini-3.1-flash-lite</p>
-                    <p className="text-[10px] text-slate-400">High availability fallback</p>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">gemini-3.7-flash</p>
+                    <p className="text-[10px] text-slate-400">Deep reasoning fallback</p>
                   </div>
                   <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                     <span className="text-[10px] font-bold text-slate-500 uppercase">Stage 3</span>
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">gemini-flash-latest</p>
-                    <p className="text-[10px] text-slate-400">Dynamic alias auto-route</p>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">gemini-3.8-flash</p>
+                    <p className="text-[10px] text-slate-400">Advanced cognition model</p>
                   </div>
                   <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                     <span className="text-[10px] font-bold text-emerald-600 uppercase">Stage 4</span>
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">gemini-3.7-flash</p>
-                    <p className="text-[10px] text-slate-400">Deep reasoning fallback</p>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">gemini-flash-latest</p>
+                    <p className="text-[10px] text-slate-400">Dynamic alias auto-route</p>
                   </div>
                 </div>
               </div>

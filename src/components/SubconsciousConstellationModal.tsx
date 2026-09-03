@@ -28,6 +28,7 @@ import {
   SemanticEcho,
   TimeWindow
 } from "../types";
+import { safeGetTime } from "../lib/dateUtils";
 
 interface SubconsciousConstellationModalProps {
   isOpen: boolean;
@@ -64,8 +65,8 @@ export const SubconsciousConstellationModal: React.FC<SubconsciousConstellationM
     const now = new Date();
     const filteredEntries = entries.filter((e) => {
       if (windowChoice === "all") return true;
-      const entryDate = new Date(e.createdAt);
-      const diffDays = (now.getTime() - entryDate.getTime()) / (1000 * 3600 * 24);
+      const entryTime = safeGetTime(e.createdAt);
+      const diffDays = (now.getTime() - entryTime) / (1000 * 3600 * 24);
       if (windowChoice === "7d") return diffDays <= 7;
       if (windowChoice === "30d") return diffDays <= 30;
       if (windowChoice === "90d") return diffDays <= 90;

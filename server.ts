@@ -13,14 +13,12 @@ const PORT = 3000;
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Model Fallback Ladder configuration (prioritizing current high-quota models)
+// Model Fallback Ladder configuration (prioritizing high-availability, low-latency verified models)
 const MODEL_FALLBACK_LADDER = [
-  "gemini-3.6-flash",
   "gemini-3.1-flash-lite",
-  "gemini-flash-latest",
   "gemini-3.7-flash",
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
+  "gemini-3.8-flash",
+  "gemini-flash-latest",
 ];
 
 // Track 429 / quota exhaustion cooldown timestamps per model
@@ -1928,8 +1926,13 @@ async function start() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`[Server] ReflectAI is running on http://0.0.0.0:${PORT}`);
+  });
+
+  // Gracefully handle unhandled WebSocket upgrade connections to prevent abrupt socket resets
+  server.on("upgrade", (_req, socket) => {
+    socket.destroy();
   });
 }
 

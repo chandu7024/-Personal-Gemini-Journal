@@ -10,6 +10,19 @@ export function stripUndefined<T>(obj: T): T {
     return obj.map((item) => stripUndefined(item)) as unknown as T;
   }
   if (typeof obj === "object") {
+    // Preserve Date instances
+    if (obj instanceof Date) {
+      return obj;
+    }
+    // Preserve Firestore Timestamp instances or FieldValue sentinels (e.g. serverTimestamp, deleteField)
+    if (
+      typeof (obj as any).toDate === "function" ||
+      "_methodName" in (obj as any) ||
+      "_delegate" in (obj as any)
+    ) {
+      return obj;
+    }
+
     const cleanObj: Record<string, any> = {};
     for (const [key, value] of Object.entries(obj)) {
       if (value !== undefined) {

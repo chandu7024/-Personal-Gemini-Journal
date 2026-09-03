@@ -43,7 +43,7 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ role: "user" | "assistant"; text: string; time: string }>>([]);
   const [currentInterimText, setCurrentInterimText] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isHandsFree, setIsHandsFree] = useState(true);
+  const [isHandsFree, setIsHandsFree] = useState(false); // Default to safe Tap-to-Speak mode to prevent unwanted background listening
   const [isAudioContextReady, setIsAudioContextReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -55,6 +55,13 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
   const recognitionRef = useRef<any>(null);
   const isSpeakingRef = useRef(false);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Synchronization refs to eliminate stale closure bugs during asynchronous audio events
+  const isHandsFreeRef = useRef(false);
+  isHandsFreeRef.current = isHandsFree;
+  const audioStateRef = useRef<AudioState>("idle");
+  audioStateRef.current = audioState;
+  const isRecognitionActiveRef = useRef(false);
 
   // Initialize Web Speech Recognition
   useEffect(() => {
@@ -94,17 +101,25 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
           setErrorMessage("Microphone access was denied. Please allow microphone permissions in your browser.");
           setAudioState("error");
+          isRecognitionActiveRef.current = false;
         }
       };
 
       recognition.onend = () => {
-        // Auto-restart if in listening state and modal is open
-        if (audioState === "listening" && !isSpeakingRef.current) {
+        // ONLY auto-restart if hands-free mode is explicitly turned on AND audioState is actively listening AND AI is not speaking
+        if (
+          isRecognitionActiveRef.current &&
+          isHandsFreeRef.current &&
+          audioStateRef.current === "listening" &&
+          !isSpeakingRef.current
+        ) {
           try {
             recognition.start();
           } catch {
             // ignore restart collision
           }
+        } else {
+          isRecognitionActiveRef.current = false;
         }
       };
 
@@ -113,16 +128,27 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
       console.warn("[Voice Recognition] Web Speech API not supported in this browser.");
     }
 
+    // Handle Escape key to safely close voice modal
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        stopAllAudio();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
     return () => {
+      window.removeEventListener("keydown", handleKeyDown);
       stopAllAudio();
     };
   }, [isOpen]);
 
-  // Clean up on modal close
+  // Clean up on modal close or pause
   const stopAllAudio = () => {
+    isRecognitionActiveRef.current = false;
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.stop();
+        recognitionRef.current.abort();
       } catch {
         // ignore
       }
@@ -154,6 +180,7 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
   // Start Mic & Audio Visualization
   const startListeningSession = async () => {
     setErrorMessage(null);
+    isRecognitionActiveRef.current = true;
     try {
       // 1. Request microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -185,6 +212,7 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
         }
       }
     } catch (err: any) {
+      isRecognitionActiveRef.current = false;
       console.error("Microphone setup failed:", err);
       setErrorMessage("Could not activate microphone. Please check your browser microphone permissions.");
       setAudioState("error");
@@ -270,7 +298,8 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
   const handleUserSpokenFinal = async (text: string) => {
     if (!text.trim() || isSpeakingRef.current) return;
 
-    // Pause recognition while processing
+    // Immediately stop speech recognition while ReflectAI processes
+    isRecognitionActiveRef.current = false;
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -324,31 +353,44 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
     } catch (err: any) {
       console.error("[Voice Journal] Processing failed:", err);
       setErrorMessage(err?.message || "Failed to process reflection turn.");
-      setAudioState("listening");
-      // Resume listening
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.start();
-        } catch {
-          // ignore
-        }
-      }
+      isRecognitionActiveRef.current = false;
+      setAudioState("idle");
     }
   };
 
   // Speak AI response with SpeechSynthesis
   const speakText = (text: string): Promise<void> => {
     return new Promise((resolve) => {
-      if (!window.speechSynthesis || isMuted) {
-        setAudioState("listening");
-        if (recognitionRef.current) {
-          try {
-            recognitionRef.current.start();
-          } catch {
-            // ignore
+      const handleSpeechDone = () => {
+        isSpeakingRef.current = false;
+        if (isHandsFreeRef.current) {
+          // In Hands-Free mode, auto-listen for next reflection
+          isRecognitionActiveRef.current = true;
+          setAudioState("listening");
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.start();
+            } catch {
+              // ignore
+            }
+          }
+        } else {
+          // In Tap-to-Speak mode (Default), return safely to idle with mic OFF
+          isRecognitionActiveRef.current = false;
+          setAudioState("idle");
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.stop();
+            } catch {
+              // ignore
+            }
           }
         }
         resolve();
+      };
+
+      if (!window.speechSynthesis || isMuted) {
+        handleSpeechDone();
         return;
       }
 
@@ -372,31 +414,12 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
       };
 
       utterance.onend = () => {
-        isSpeakingRef.current = false;
-        setAudioState("listening");
-        // Resume speech recognition after AI finishes speaking
-        if (recognitionRef.current && isHandsFree) {
-          try {
-            recognitionRef.current.start();
-          } catch {
-            // ignore
-          }
-        }
-        resolve();
+        handleSpeechDone();
       };
 
       utterance.onerror = (e) => {
         console.warn("[SpeechSynthesis] Error:", e);
-        isSpeakingRef.current = false;
-        setAudioState("listening");
-        if (recognitionRef.current) {
-          try {
-            recognitionRef.current.start();
-          } catch {
-            // ignore
-          }
-        }
-        resolve();
+        handleSpeechDone();
       };
 
       window.speechSynthesis.speak(utterance);
@@ -423,13 +446,22 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          stopAllAudio();
+          onClose();
+        }
+      }}
+    >
       <div
         id="modal-socratic-voice-journal"
+        onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-2xl bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden max-h-[90vh]"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80">
           <div className="flex items-center gap-3">
             <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 via-indigo-600 to-indigo-700 text-white shadow-xs">
               <Radio className="w-5 h-5 animate-pulse" />
@@ -440,16 +472,50 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
                   Socratic Voice Journaling
                 </h3>
                 <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">
-                  Live Spoken Reflection
+                  Interactive Audio
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                {activeEntry ? `Linked to: "${activeEntry.title}"` : "Hands-free audio dialogue with Gemini 3.6 Flash"}
+                {activeEntry ? `Linked to: "${activeEntry.title}"` : "Guided reflective dialogue with ReflectAI"}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Mode Switcher: Tap to Speak vs Continuous */}
+            <div className="flex items-center bg-slate-200/70 dark:bg-slate-800/80 p-0.5 rounded-lg border border-slate-300/60 dark:border-slate-700 text-xs">
+              <button
+                id="btn-mode-tap-to-speak"
+                onClick={() => {
+                  setIsHandsFree(false);
+                  isHandsFreeRef.current = false;
+                }}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                  !isHandsFree
+                    ? "bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-2xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                }`}
+                title="Tap to Speak: Microphone only activates when you click Start Speaking"
+              >
+                Tap to Speak
+              </button>
+              <button
+                id="btn-mode-continuous"
+                onClick={() => {
+                  setIsHandsFree(true);
+                  isHandsFreeRef.current = true;
+                }}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                  isHandsFree
+                    ? "bg-purple-600 text-white shadow-2xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                }`}
+                title="Continuous Mode: Microphone automatically resumes listening after AI finishes speaking"
+              >
+                Continuous
+              </button>
+            </div>
+
             <button
               id="btn-toggle-voice-mute"
               onClick={() => {
@@ -463,7 +529,7 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
                   ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/50 dark:border-rose-800"
                   : "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
               }`}
-              title={isMuted ? "Unmute Spoken Guide" : "Mute Spoken Guide"}
+              title={isMuted ? "Unmute Spoken Voice" : "Mute Spoken Voice"}
             >
               {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
@@ -492,16 +558,22 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
             />
 
             {audioState === "idle" && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xs">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                  <Mic className="w-4 h-4 text-purple-600" /> Click "Start Speaking" to begin
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/75 dark:bg-slate-900/75 backdrop-blur-2xs gap-1 text-center px-4">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <Mic className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  Microphone is currently off
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {isHandsFree
+                    ? "Continuous mode enabled. Tap Start Speaking to begin your dialogue."
+                    : "Tap 'Start Speaking' below whenever you want to share a thought."}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Audio State Indicator Badge */}
-          <div className="flex items-center gap-3">
+          {/* Audio State Indicator Badge & Action Controls */}
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <div
               className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                 audioState === "listening"
@@ -536,35 +608,89 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
               {audioState === "idle" && (
                 <>
                   <span className="w-2 h-2 rounded-full bg-slate-400" />
-                  <span>Voice Engine Ready</span>
+                  <span>Microphone Paused</span>
                 </>
               )}
               {audioState === "error" && (
                 <>
                   <span className="w-2 h-2 rounded-full bg-rose-500" />
-                  <span>Microphone issue</span>
+                  <span>Microphone Access Required</span>
                 </>
               )}
             </div>
 
-            {/* Main Mic Toggle Button */}
+            {/* Main Interactive Controls */}
             {audioState === "idle" ? (
               <button
                 id="btn-start-voice-session"
                 onClick={startListeningSession}
-                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-xs transition-all cursor-pointer ring-1 ring-purple-600/20"
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-sm hover:shadow-md transition-all cursor-pointer ring-2 ring-purple-500/20"
               >
-                <Mic className="w-3.5 h-3.5" />
+                <Mic className="w-4 h-4" />
                 <span>Start Speaking</span>
+              </button>
+            ) : audioState === "listening" ? (
+              <div className="flex items-center gap-2">
+                {currentInterimText && (
+                  <button
+                    id="btn-submit-speech-now"
+                    onClick={() => {
+                      if (currentInterimText.trim()) {
+                        const captured = currentInterimText.trim();
+                        setCurrentInterimText("");
+                        handleUserSpokenFinal(captured);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-colors cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Done Speaking</span>
+                  </button>
+                )}
+                <button
+                  id="btn-pause-voice-session"
+                  onClick={stopAllAudio}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                >
+                  <Square className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Pause Mic</span>
+                </button>
+              </div>
+            ) : audioState === "speaking" ? (
+              <button
+                id="btn-skip-speech"
+                onClick={() => {
+                  if (window.speechSynthesis) {
+                    window.speechSynthesis.cancel();
+                  }
+                  isSpeakingRef.current = false;
+                  if (isHandsFreeRef.current) {
+                    setAudioState("listening");
+                    isRecognitionActiveRef.current = true;
+                    if (recognitionRef.current) {
+                      try {
+                        recognitionRef.current.start();
+                      } catch {
+                        // ignore
+                      }
+                    }
+                  } else {
+                    setAudioState("idle");
+                    isRecognitionActiveRef.current = false;
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-800 transition-colors cursor-pointer"
+              >
+                <span>Skip Spoken Audio</span>
               </button>
             ) : (
               <button
-                id="btn-pause-voice-session"
+                id="btn-reset-voice-session"
                 onClick={stopAllAudio}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
               >
-                <Square className="w-3.5 h-3.5 text-rose-500" />
-                <span>Pause Session</span>
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Reset</span>
               </button>
             )}
           </div>
@@ -572,7 +698,7 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
           {/* Current Live Interim Speech Bubble */}
           {currentInterimText && (
             <div className="mt-3 px-4 py-2 rounded-xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/60 dark:border-purple-800/50 text-xs text-purple-900 dark:text-purple-200 animate-pulse text-center max-w-lg">
-              <span className="font-semibold mr-1.5">You:</span> "{currentInterimText}"
+              <span className="font-semibold mr-1.5">Hearing:</span> "{currentInterimText}"
             </div>
           )}
 

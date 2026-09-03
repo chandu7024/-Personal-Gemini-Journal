@@ -10,6 +10,7 @@ import { CognitiveAnalyticsHub } from "./CognitiveAnalyticsHub";
 import { SocraticVoiceModal } from "./SocraticVoiceModal";
 import { SubconsciousConstellationModal } from "./SubconsciousConstellationModal";
 import { ReminderConfigModal } from "./ReminderConfigModal";
+import { UserProfileModal } from "./UserProfileModal";
 import {
   subscribeToUserEntries,
   subscribeToEntryMessages,
@@ -23,7 +24,7 @@ import {
   saveEntryCognitiveAnalysis,
 } from "../lib/firebase";
 import { sendChatMessage, summarizeJournalEntry, analyzeCognitiveBiases } from "../lib/geminiApi";
-import type { JournalEntry, JournalMessage, ReflectionMode, EntryLocation, UserRole, EmailReminderSettings } from "../types";
+import type { JournalEntry, JournalMessage, ReflectionMode, EntryLocation, UserRole, EmailReminderSettings, UserProfile } from "../types";
 import { Loader2, Plus, Sparkles, BookOpen, Mic } from "lucide-react";
 
 interface DashboardProps {
@@ -35,6 +36,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const [messages, setMessages] = useState<JournalMessage[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userRole, setUserRole] = useState<UserRole>(user.email === "chandu7024@gmail.com" ? "admin" : "user");
   const [reminderSettings, setReminderSettings] = useState<EmailReminderSettings | null>(null);
   
@@ -51,13 +53,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isConstellationModalOpen, setIsConstellationModalOpen] = useState(false);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-  // Subscribe to user profile to monitor role in real-time
+  // Subscribe to user profile to monitor role & display name in real-time
   useEffect(() => {
     if (!user.uid) return;
     const unsubscribeProfile = subscribeToUserProfile(user.uid, (profile) => {
-      if (profile && profile.role) {
-        setUserRole(profile.role);
+      if (profile) {
+        setUserProfile(profile);
+        if (profile.role) {
+          setUserRole(profile.role);
+        }
       }
     });
     const unsubscribeReminders = subscribeUserReminderSettings(user.uid, (settings) => {
@@ -380,7 +386,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     await saveJournalMessage(user.uid, targetEntryId, {
       role: "assistant",
       content: aiText,
-      modelUsed: "gemini-3.6-flash",
+      modelUsed: "gemini-3.7-flash",
     });
 
     // Update snippet
@@ -409,15 +415,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     return newId;
   };
 
+  const effectiveDisplayName =
+    userProfile?.displayName ||
+    user?.displayName ||
+    (user?.email ? user.email.split("@")[0] : "ReflectAI User");
+
   return (
     <div className="min-h-screen bg-slate-100/75 dark:bg-[#0b0f17] flex flex-col antialiased">
       {/* Top Navigation */}
       <Navbar
         user={user}
+        userProfile={userProfile}
         userRole={userRole}
         reminderSettings={reminderSettings}
         onSignOut={onSignOut}
         onNewEntry={handleNewEntry}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
         onOpenVoiceJournal={() => setIsVoiceModalOpen(true)}
         onOpenConstellation={() => setIsConstellationModalOpen(true)}
         onOpenReminders={() => setIsReminderModalOpen(true)}
@@ -434,6 +447,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         <Sidebar
           entries={entries}
           activeEntryId={activeEntryId}
+          user={user}
+          userProfile={userProfile}
+          userRole={userRole}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
           onSelectEntry={(id) => setActiveEntryId(id)}
           onNewEntry={handleNewEntry}
           onOpenVoiceJournal={() => setIsVoiceModalOpen(true)}
@@ -458,10 +475,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
               <BookOpen className="w-7 h-7" />
             </div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">
-              Your Private Journal is Ready
+              Welcome back, {effectiveDisplayName} 👋
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mb-6 leading-relaxed">
-              Create your first journal entry or launch live voice reflections with Gemini. All data is strictly encrypted and isolated in Firestore.
+              Your private reflection sanctuary is ready. Create your first journal entry or launch live voice reflections with Gemini. All data is strictly encrypted and isolated in Firestore.
             </p>
             <div className="flex items-center gap-3">
               <button
@@ -580,6 +597,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         onSaved={(newSettings) => {
           setReminderSettings(newSettings);
         }}
+      />
+
+      {/* User Profile & Name Customization Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        user={user}
+        userProfile={userProfile}
+        userRole={userRole}
+        totalEntriesCount={entries.length}
       />
     </div>
   );

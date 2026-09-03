@@ -5,6 +5,7 @@ import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
+  updateProfile,
   type User,
 } from "firebase/auth";
 import {
@@ -22,6 +23,7 @@ import {
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 import { stripUndefined } from "./sanitizer";
+import { normalizeToIsoString } from "./dateUtils";
 import type { JournalEntry, JournalMessage, JournalSummary, CognitiveAnalysisResult, ReflectionMode, UserProfile, UserRole, SystemAuditLog, EmailReminderSettings } from "../types";
 
 // Initialize Firebase App
@@ -55,11 +57,16 @@ export async function signInWithGoogle(): Promise<User> {
     role = "admin";
   }
 
+  // Determine friendly display name
+  const effectiveDisplayName =
+    user.displayName ||
+    (user.email ? user.email.split("@")[0] : "Executive User");
+
   await setDoc(
     userDocRef,
     stripUndefined({
       uid: user.uid,
-      displayName: user.displayName || "Anonymous User",
+      displayName: effectiveDisplayName,
       email: user.email,
       photoURL: user.photoURL,
       role,
@@ -70,6 +77,35 @@ export async function signInWithGoogle(): Promise<User> {
   );
 
   return user;
+}
+
+/**
+ * Update the user's display name across Firestore and Firebase Auth
+ */
+export async function updateUserProfileDisplayName(
+  userId: string,
+  newDisplayName: string
+): Promise<void> {
+  const cleanName = newDisplayName.trim().slice(0, 50);
+  if (!cleanName) throw new Error("Display name cannot be empty");
+
+  // Update in Firestore
+  const userDocRef = doc(db, "users", userId);
+  await updateDoc(userDocRef, {
+    displayName: cleanName,
+    updatedAt: serverTimestamp(),
+  });
+
+  // Update in Firebase Auth currentUser if active
+  if (auth.currentUser && auth.currentUser.uid === userId) {
+    try {
+      await updateProfile(auth.currentUser, {
+        displayName: cleanName,
+      });
+    } catch (err) {
+      console.warn("[Auth] Could not update Auth profile displayName:", err);
+    }
+  }
 }
 
 /**
@@ -97,8 +133,8 @@ export function subscribeToUserProfile(
           email: data.email || null,
           photoURL: data.photoURL || null,
           role: (data.role as UserRole) || "user",
-          createdAt: data.createdAt || new Date().toISOString(),
-          lastLogin: data.lastLogin || new Date().toISOString(),
+          createdAt: normalizeToIsoString(data.createdAt),
+          lastLogin: normalizeToIsoString(data.lastLogin),
         });
       } else {
         onUpdate(null);
@@ -127,8 +163,8 @@ export async function fetchAllUsers(): Promise<UserProfile[]> {
         email: data.email || null,
         photoURL: data.photoURL || null,
         role: (data.role as UserRole) || "user",
-        createdAt: data.createdAt || new Date().toISOString(),
-        lastLogin: data.lastLogin || new Date().toISOString(),
+        createdAt: normalizeToIsoString(data.createdAt),
+        lastLogin: normalizeToIsoString(data.lastLogin),
       });
     });
     return users;
@@ -230,8 +266,8 @@ export function subscribeToUserEntries(
           mode: (data.mode as ReflectionMode) || "mindful",
           tags: Array.isArray(data.tags) ? data.tags : [],
           mood: data.mood,
-          createdAt: data.createdAt || new Date().toISOString(),
-          updatedAt: data.updatedAt ? (typeof data.updatedAt.toDate === "function" ? data.updatedAt.toDate().toISOString() : data.updatedAt) : new Date().toISOString(),
+          createdAt: normalizeToIsoString(data.createdAt),
+          updatedAt: normalizeToIsoString(data.updatedAt),
           messageCount: data.messageCount || 0,
           summary: data.summary || null,
           cognitiveAnalysis: data.cognitiveAnalysis || null,
@@ -275,7 +311,7 @@ export function subscribeToEntryMessages(
           id: docSnap.id,
           role: data.role === "assistant" ? "assistant" : "user",
           content: data.content || "",
-          timestamp: data.timestamp || new Date().toISOString(),
+          timestamp: normalizeToIsoString(data.timestamp),
           modelUsed: data.modelUsed,
         });
       });
@@ -367,7 +403,7 @@ export async function saveJournalMessage(
   const msgPayload = stripUndefined({
     role: message.role,
     content: message.content,
-    modelUsed: message.modelUsed || (message.role === "assistant" ? "gemini-3.6-flash" : undefined),
+    modelUsed: message.modelUsed || (message.role === "assistant" ? "gemini-3.7-flash" : undefined),
     timestamp: now,
   });
 

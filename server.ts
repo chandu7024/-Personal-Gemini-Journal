@@ -2083,33 +2083,29 @@ app.use("/api", (err: any, _req: express.Request, res: express.Response, _next: 
 
 // Vite & Static Asset Handling
 async function start() {
-  if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: {
-        middlewareMode: true,
-        hmr: false,
-        watch: null,
-      },
-      appType: "spa",
+  try {
+    if (process.env.NODE_ENV !== "production") {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (_req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`[Server] ReflectAI is running on http://0.0.0.0:${PORT}`);
     });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+  } catch (err) {
+    console.error("[Fatal Server Error] Failed to start server:", err);
+    process.exit(1);
   }
-
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Server] ReflectAI is running on http://0.0.0.0:${PORT}`);
-  });
-
-  // Gracefully handle unhandled WebSocket upgrade connections to prevent abrupt socket resets
-  server.on("upgrade", (_req, socket) => {
-    socket.destroy();
-  });
 }
 
 start();

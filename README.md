@@ -420,7 +420,21 @@ service cloud.firestore {
      --role="roles/secretmanager.secretAccessor"
    ```
 
-3. **Build & Deploy Container to Cloud Run**:
+3. **Deploy Cloud Firestore Security Rules**:
+   Ensure `firestore.rules` is deployed to lock down database security and enforce tenant isolation:
+   ```bash
+   # Install Firebase CLI if not already installed
+   npm install -g firebase-tools
+
+   # Authenticate with Firebase
+   firebase login
+
+   # Target your project and deploy the security rules
+   firebase use YOUR_PROJECT_ID
+   firebase deploy --only firestore:rules
+   ```
+
+4. **Build & Deploy Container to Cloud Run**:
    ```bash
    gcloud run deploy reflect-ai \
      --source . \
@@ -431,7 +445,7 @@ service cloud.firestore {
      --set-secrets GEMINI_API_KEY=GEMINI_API_KEY:latest
    ```
 
-4. **Apply Mandatory Challenge Verification Label**:
+5. **Apply Mandatory Challenge Verification Label**:
    ```bash
    gcloud run services update reflect-ai \
      --update-labels=dev-tutorial=cloud-run-ai-challenge \

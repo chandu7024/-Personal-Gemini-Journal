@@ -12,7 +12,43 @@
 
 ---
 
-## 🎯 Why ReflectAI?
+## 📦 Challenge Submission Checklist (Frontend + Backend + Rules + Config)
+
+This repository strictly fulfills all submission requirements:
+
+| Required Component | Repository Location | Description |
+| :--- | :--- | :--- |
+| **🌐 Frontend Code** | [`/src`](https://github.com/chandu7024/-Personal-Gemini-Journal/tree/main/src) & `index.html` | React 19, TypeScript, Tailwind CSS, Socratic Voice Visualizer (Web Audio API), D3 Constellation Physics, Firebase Client Auth, and UI views. |
+| **⚙️ Backend Code** | [`server.ts`](https://github.com/chandu7024/-Personal-Gemini-Journal/blob/main/server.ts) & [`/server`](https://github.com/chandu7024/-Personal-Gemini-Journal/tree/main/server) | Express.js server, Gemini 3.6 Flash Multi-Model Ladder (`/api/ai/*`), Cognitive Distortion Radar, Longitudinal Analytics, SMTP/Webhook Proxies, and Secret Manager resolution. |
+| **📖 README.md with Deployment** | [`README.md`](https://github.com/chandu7024/-Personal-Gemini-Journal/blob/main/README.md) | Comprehensive Cloud Run deployment commands, Secret Manager bindings, architecture diagrams, and challenge labels. |
+| **🔒 Firestore Security Rules** | [`firestore.rules`](https://github.com/chandu7024/-Personal-Gemini-Journal/blob/main/firestore.rules) | Complete owner-bound tenant isolation (`request.auth.uid == userId`), dynamic RBAC role lookups, and anti-IDOR protections. |
+| **🛠️ Reproducibility Configs** | `package.json`, `tsconfig.json`, `vite.config.ts`, `.env.example` | Unified production build & dev scripts (`npm run build`, `npm run start`), TypeScript configs, and environment variable declarations. |
+
+```
+├── 🌐 FRONTEND CODE (React 19 + TypeScript + Tailwind)
+│   ├── src/
+│   │   ├── components/       # UI Views: Dashboard, Voice Journal, D3 Constellation, Admin Console
+│   │   ├── lib/              # Firebase Client SDK, Theme Engine, Web Audio Analyzer
+│   │   ├── types.ts          # Shared TypeScript Interfaces & Data Contracts
+│   │   └── index.css         # Tailwind CSS entrypoint
+│   └── index.html            # Single Page Application HTML Entrypoint
+│
+├── ⚙️ BACKEND CODE (Node.js + Express + Google Gen AI SDK)
+│   ├── server.ts             # Express Server, Gemini AI API Proxy, Rate Limiting, RBAC & Audit
+│   └── server/README.md      # Backend Service Architecture & Route Specification
+│
+├── 🔒 FIRESTORE SECURITY RULES
+│   └── firestore.rules       # Cloud Firestore Production Rules (Owner isolation & RBAC)
+│
+└── 🛠️ REPRODUCIBILITY CONFIGURATIONS
+    ├── package.json          # Dependencies & Unified Full-Stack Run Scripts
+    ├── tsconfig.json         # TypeScript Compiler Configuration
+    ├── vite.config.ts        # Vite Bundler & Middleware Configuration
+    ├── metadata.json         # AI Studio Application Metadata & Permissions
+    └── .env.example          # Environment Variable Blueprint (Zero hardcoded secrets)
+```
+
+---
 
 Most AI assistants answer questions. Most journaling applications store static thoughts.
 

@@ -56,3 +56,137 @@
 .google-card-interactive {
   @apply bg-white dark:bg-[#0f172a] border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700/80 transition-all duration-200 cursor-pointer;
 }
+
+/* ==========================================================================
+   Executive Theme System - Professional Visual Palettes
+   ========================================================================== */
+
+/* Theme: Warm Linen (Organic Almond Parchment & Stone) */
+html[data-theme="warm-linen"] {
+  --theme-bg-canvas: #faf7f2;
+  --theme-bg-card: #fffdf9;
+  --theme-bg-subtle: #f3ede2;
+  --theme-border: #e7e0d3;
+  --theme-text-primary: #292524;
+  --theme-text-muted: #78716c;
+}
+
+html[data-theme="warm-linen"] body,
+html[data-theme="warm-linen"] .min-h-screen {
+  background-color: #faf7f2 !important;
+  color: #292524 !important;
+}
+
+html[data-theme="warm-linen"] nav,
+html[data-theme="warm-linen"] aside,
+html[data-theme="warm-linen"] .bg-white {
+  background-color: #fffdf9 !important;
+}
+
+html[data-theme="warm-linen"] .bg-slate-100\/75,
+html[data-theme="warm-linen"] .bg-slate-50,
+html[data-theme="warm-linen"] .bg-slate-100 {
+  background-color: #f3ede2 !important;
+}
+
+html[data-theme="warm-linen"] .border-slate-200,
+html[data-theme="warm-linen"] .border-slate-200\/80,
+html[data-theme="warm-linen"] .border-slate-200\/60 {
+  border-color: #e7e0d3 !important;
+}
+
+html[data-theme="warm-linen"] .text-slate-900 {
+  color: #292524 !important;
+}
+
+html[data-theme="warm-linen"] .text-slate-600,
+html[data-theme="warm-linen"] .text-slate-500 {
+  color: #78716c !important;
+}
+
+/* Theme: Nordic Sage (Mindful Scandinavian Eucalyptus & Mist) */
+html[data-theme="nordic-sage"] {
+  --theme-bg-canvas: #f4f7f5;
+  --theme-bg-card: #ffffff;
+  --theme-bg-subtle: #e8f1eb;
+  --theme-border: #d4e3d8;
+  --theme-text-primary: #192e22;
+  --theme-text-muted: #526b5d;
+}
+
+html[data-theme="nordic-sage"] body,
+html[data-theme="nordic-sage"] .min-h-screen {
+  background-color: #f4f7f5 !important;
+  color: #192e22 !important;
+}
+
+html[data-theme="nordic-sage"] nav,
+html[data-theme="nordic-sage"] aside,
+html[data-theme="nordic-sage"] .bg-white {
+  background-color: #ffffff !important;
+}
+
+html[data-theme="nordic-sage"] .bg-slate-100\/75,
+html[data-theme="nordic-sage"] .bg-slate-50,
+html[data-theme="nordic-sage"] .bg-slate-100 {
+  background-color: #e8f1eb !important;
+}
+
+html[data-theme="nordic-sage"] .border-slate-200,
+html[data-theme="nordic-sage"] .border-slate-200\/80,
+html[data-theme="nordic-sage"] .border-slate-200\/60 {
+  border-color: #d4e3d8 !important;
+}
+
+html[data-theme="nordic-sage"] .text-slate-900 {
+  color: #192e22 !important;
+}
+
+html[data-theme="nordic-sage"] .text-slate-600,
+html[data-theme="nordic-sage"] .text-slate-500 {
+  color: #526b5d !important;
+}
+
+/* Theme: Executive Ice (Arctic Corporate Slate & Glacier Mist) */
+html[data-theme="executive-ice"] {
+  --theme-bg-canvas: #f0f4f8;
+  --theme-bg-card: #ffffff;
+  --theme-bg-subtle: #e2ecf5;
+  --theme-border: #cad8e6;
+  --theme-text-primary: #0f172a;
+  --theme-text-muted: #475569;
+}
+
+html[data-theme="executive-ice"] body,
+html[data-theme="executive-ice"] .min-h-screen {
+  background-color: #f0f4f8 !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="executive-ice"] nav,
+html[data-theme="executive-ice"] aside,
+html[data-theme="executive-ice"] .bg-white {
+  background-color: #ffffff !important;
+}
+
+html[data-theme="executive-ice"] .bg-slate-100\/75,
+html[data-theme="executive-ice"] .bg-slate-50,
+html[data-theme="executive-ice"] .bg-slate-100 {
+  background-color: #e2ecf5 !important;
+}
+
+html[data-theme="executive-ice"] .border-slate-200,
+html[data-theme="executive-ice"] .border-slate-200\/80,
+html[data-theme="executive-ice"] .border-slate-200\/60 {
+  border-color: #cad8e6 !important;
+}
+
+html[data-theme="executive-ice"] .text-slate-900 {
+  color: #0f172a !important;
+}
+
+html[data-theme="executive-ice"] .text-slate-600,
+html[data-theme="executive-ice"] .text-slate-500 {
+  color: #475569 !important;
+}
+

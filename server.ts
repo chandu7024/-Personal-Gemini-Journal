@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import nodemailer from "nodemailer";
@@ -13,13 +14,52 @@ const PORT = 3000;
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Model Fallback Ladder configuration (prioritizing high-availability, low-latency verified models)
+// Model Fallback Ladder configuration (prioritizing ultra-low-latency, verified models)
 const MODEL_FALLBACK_LADDER = [
   "gemini-3.1-flash-lite",
-  "gemini-3.7-flash",
-  "gemini-3.8-flash",
   "gemini-flash-latest",
+  "gemini-3.8-flash",
 ];
+
+// In-Memory Fast Response Cache for Syntheses, Audits, and Diagnostics
+interface CacheEntry<T> {
+  data: T;
+  modelUsed?: string;
+  expiresAt: number;
+}
+
+const apiResponseCache = new Map<string, CacheEntry<any>>();
+
+function getCachedResponse<T>(cacheKey: string): { data: T; modelUsed?: string } | null {
+  const cached = apiResponseCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) {
+    return { data: cached.data, modelUsed: cached.modelUsed };
+  }
+  if (cached) {
+    apiResponseCache.delete(cacheKey);
+  }
+  return null;
+}
+
+function setCachedResponse<T>(cacheKey: string, data: T, ttlMs: number, modelUsed?: string): void {
+  if (apiResponseCache.size > 250) {
+    const oldestKey = apiResponseCache.keys().next().value;
+    if (oldestKey) apiResponseCache.delete(oldestKey);
+  }
+  apiResponseCache.set(cacheKey, {
+    data,
+    modelUsed,
+    expiresAt: Date.now() + ttlMs,
+  });
+}
+
+function createHashKey(prefix: string, payload: any): string {
+  try {
+    return `${prefix}:${crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex")}`;
+  } catch {
+    return `${prefix}:${Date.now()}_${Math.random()}`;
+  }
+}
 
 // Track 429 / quota exhaustion cooldown timestamps per model
 const modelCooldownUntil: Record<string, number> = {};
@@ -99,11 +139,15 @@ function parseRetryDelayMs(err: any): number {
 
 /**
  * Resilient content generation wrapper executing across the model ladder
+ * Featuring per-model abort timeouts and direct JSON configuration for high-speed throughput
  */
 async function generateContentWithFallback(params: {
   contents: any[];
   systemInstruction?: string;
   temperature?: number;
+  responseMimeType?: string;
+  maxOutputTokens?: number;
+  timeoutMs?: number;
 }): Promise<{ text: string; modelUsed: string }> {
   const ai = getGenAiClient();
   let lastError: any = null;
@@ -119,26 +163,58 @@ async function generateContentWithFallback(params: {
   const modelsToAttempt = availableModels.length > 0 ? availableModels : MODEL_FALLBACK_LADDER;
 
   for (const model of modelsToAttempt) {
+    let timeoutId: NodeJS.Timeout | null = null;
     try {
       console.log(`[Gemini API] Attempting generation with model: ${model}`);
+      const controller = new AbortController();
+      const timeoutLimit = params.timeoutMs || 9000;
+      timeoutId = setTimeout(() => {
+        controller.abort();
+      }, timeoutLimit);
+
+      const config: any = {
+        systemInstruction: params.systemInstruction,
+        temperature: params.temperature ?? 0.7,
+        abortSignal: controller.signal,
+      };
+
+      if (params.responseMimeType) {
+        config.responseMimeType = params.responseMimeType;
+      }
+      if (params.maxOutputTokens) {
+        config.maxOutputTokens = params.maxOutputTokens;
+      }
+
       const response = await ai.models.generateContent({
         model,
         contents: params.contents,
-        config: {
-          systemInstruction: params.systemInstruction,
-          temperature: params.temperature ?? 0.7,
-        },
+        config,
       });
+
+      if (timeoutId) clearTimeout(timeoutId);
 
       const responseText = response.text || "";
       // Reset cooldown upon successful generation
       delete modelCooldownUntil[model];
       return { text: responseText, modelUsed: model };
     } catch (err: any) {
+      if (timeoutId) clearTimeout(timeoutId);
       lastError = err;
-      const status = err?.status || err?.statusCode || (err?.message?.includes("429") || err?.message?.includes("RESOURCE_EXHAUSTED") ? 429 : (err?.message?.includes("503") || err?.message?.includes("UNAVAILABLE")) ? 503 : 500);
-      
-      if (status === 429 || String(err?.message || "").includes("RESOURCE_EXHAUSTED")) {
+      const isAbort = err?.name === "AbortError" || String(err?.message || "").includes("aborted");
+      const status = isAbort
+        ? 504
+        : err?.status ||
+          err?.statusCode ||
+          (err?.message?.includes("429") || err?.message?.includes("RESOURCE_EXHAUSTED")
+            ? 429
+            : err?.message?.includes("503") || err?.message?.includes("UNAVAILABLE")
+            ? 503
+            : 500);
+
+      if (isAbort) {
+        console.warn(`[Gemini API] Model ${model} timed out after ${params.timeoutMs || 9000}ms. Switching to fallback model...`);
+        modelCooldownUntil[model] = Date.now() + 15000;
+      } else if (status === 429 || String(err?.message || "").includes("RESOURCE_EXHAUSTED")) {
         const cooldownMs = parseRetryDelayMs(err);
         modelCooldownUntil[model] = Date.now() + cooldownMs;
         console.warn(`[Gemini API] Model ${model} rate-limited (429). Cooldown set for ${Math.round(cooldownMs / 1000)}s. Attempting next fallback...`);
@@ -204,12 +280,14 @@ app.post("/api/chat", async (req, res) => {
       locationContext = `\n\nGeographic Context: The user is reflecting from "${placeName}". Ground your reflections with atmospheric, contemplative, or environmental awareness when appropriate without revealing private coordinates.`;
     }
 
-    const finalSystemInstruction = `${modeInstruction}${locationContext}${customInstruction ? `\n\nUser Context: ${customInstruction}` : ""}`;
+    const finalSystemInstruction = `${modeInstruction}${locationContext}${customInstruction ? `\n\nUser Context: ${customInstruction}` : ""}\n\nCRITICAL LANGUAGE DIRECTIVE: You MUST ALWAYS respond strictly in fluent, natural English. Never generate responses in any other language under any circumstance, even if user input contains foreign words or non-English phrases.`;
 
     const result = await generateContentWithFallback({
       contents: formattedContents,
       systemInstruction: finalSystemInstruction,
       temperature: mode === "brainstorm" ? 0.9 : 0.65,
+      maxOutputTokens: 800,
+      timeoutMs: 8000,
     });
 
     return res.json({
@@ -250,12 +328,15 @@ app.post("/api/ai/socratic-turn", async (req, res) => {
     const finalSystemInstruction = `You are ReflectAI's Real-time Socratic Facilitator.
 Help the user explore thoughts deeply, question assumptions gently, and discover inner wisdom.
 Keep responses concise, conversational, and contemplative (1-3 sentences) suitable for reflective pacing.
+CRITICAL LANGUAGE DIRECTIVE: You MUST ALWAYS speak and respond strictly in fluent, natural English. Never reply in any other language under any circumstance.
 ${customInstruction ? `\n\nContext: ${customInstruction}` : ""}`;
 
     const result = await generateContentWithFallback({
       contents: formattedContents,
       systemInstruction: finalSystemInstruction,
       temperature: 0.65,
+      maxOutputTokens: 250,
+      timeoutMs: 6000,
     });
 
     return res.json({
@@ -298,16 +379,19 @@ app.post("/api/audio/socratic-turn", async (req, res) => {
 
     const voicePromptInstruction = `You are ReflectAI, an executive Socratic voice guide conducting a live spoken reflection session.
 Guidelines for spoken output:
-1. Speak with warmth, calm curiosity, and emotional presence.
-2. Keep your response strictly under 2 to 3 concise spoken sentences (30-50 words maximum).
-3. First briefly validate the user's emotional state or insight (${mood ? `current mood: ${mood}` : "grounded reflection"}).
-4. Then pose one deep, high-agency Socratic question that cuts to root assumptions or invites constructive reframing.
-5. Do NOT use bullet points, bold tags, or markdown, as this text is spoken aloud directly by speech synthesis.`;
+1. STRICT LANGUAGE REQUIREMENT: You MUST speak strictly in clear, fluent, natural ENGLISH at all times. Every word must be standard English. Under NO circumstance should you switch to or output any other language, even if the user speaks with a foreign accent or foreign words.
+2. Speak with warmth, calm curiosity, and emotional presence.
+3. Keep your response strictly under 2 to 3 concise spoken sentences (30-50 words maximum).
+4. First briefly validate the user's emotional state or insight (${mood ? `current mood: ${mood}` : "grounded reflection"}).
+5. Then pose one deep, high-agency Socratic question that cuts to root assumptions or invites constructive reframing.
+6. Do NOT use bullet points, bold tags, or markdown, as this text is spoken aloud directly by speech synthesis.`;
 
     const result = await generateContentWithFallback({
       contents: formattedContents,
       systemInstruction: voicePromptInstruction,
       temperature: 0.6,
+      maxOutputTokens: 150,
+      timeoutMs: 5000,
     });
 
     // Clean any markdown formatting for seamless audio synthesis
@@ -339,6 +423,18 @@ app.post("/api/summarize", async (req, res) => {
       return res.status(400).json({ error: "Missing or invalid 'messages' array for summarization." });
     }
 
+    // Cache check for identical reflection content
+    const cacheKey = createHashKey("summarize", { messages, title });
+    const cached = getCachedResponse<any>(cacheKey);
+    if (cached) {
+      return res.json({
+        success: true,
+        summary: cached.data,
+        modelUsed: cached.modelUsed || "cache-hit",
+        cached: true,
+      });
+    }
+
     const conversationText = messages
       .map((m: any) => `${m.role === "assistant" ? "AI Reflection" : "User Journal"}: ${m.content}`)
       .join("\n\n");
@@ -366,6 +462,9 @@ Return ONLY the raw JSON object without markdown fences.`;
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       systemInstruction: "You are an analytical journaling expert. Return strictly valid JSON with no markdown wrapping.",
       temperature: 0.3,
+      responseMimeType: "application/json",
+      maxOutputTokens: 800,
+      timeoutMs: 8000,
     });
 
     let parsedJson: any = null;
@@ -383,6 +482,9 @@ Return ONLY the raw JSON object without markdown fences.`;
         executiveSummary: cleanText.slice(0, 200),
       };
     }
+
+    // Cache synthesis for 10 minutes
+    setCachedResponse(cacheKey, parsedJson, 10 * 60 * 1000, result.modelUsed);
 
     return res.json({
       success: true,
@@ -413,6 +515,18 @@ app.post("/api/cognitive-analysis", async (req, res) => {
       contentToAnalyze = text.trim();
     } else {
       return res.status(400).json({ error: "Missing 'messages' array or 'text' content to analyze." });
+    }
+
+    // Cache lookup for cognitive diagnosis
+    const cacheKey = createHashKey("cog", { contentToAnalyze, title });
+    const cached = getCachedResponse<any>(cacheKey);
+    if (cached) {
+      return res.json({
+        success: true,
+        analysis: cached.data,
+        modelUsed: cached.modelUsed || "cache-hit",
+        cached: true,
+      });
     }
 
     const prompt = `You are an elite Cognitive Behavioral Scientist and Psychological Reasoning Engine powered by Gemini.
@@ -466,6 +580,9 @@ Return ONLY the raw JSON object without markdown formatting.`;
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       systemInstruction: "You are a master cognitive psychologist and behavioral diagnostic specialist. Return strictly valid JSON with no markdown wrapping.",
       temperature: 0.25,
+      responseMimeType: "application/json",
+      maxOutputTokens: 1600,
+      timeoutMs: 10000,
     });
 
     let analysis: any = null;
@@ -518,6 +635,9 @@ Return ONLY the raw JSON object without markdown formatting.`;
     analysis.analyzedAt = new Date().toISOString();
     analysis.modelUsed = result.modelUsed;
 
+    // Cache analysis for 10 minutes
+    setCachedResponse(cacheKey, analysis, 10 * 60 * 1000, result.modelUsed);
+
     return res.json({
       success: true,
       analysis,
@@ -542,6 +662,18 @@ app.post("/api/cognitive-analysis/reframe-thought", async (req, res) => {
       return res.status(400).json({ error: "Missing or invalid 'thoughtText' payload." });
     }
 
+    // Cache check for instant reframing
+    const cacheKey = createHashKey("reframe", { thoughtText: thoughtText.trim() });
+    const cached = getCachedResponse<any>(cacheKey);
+    if (cached) {
+      return res.json({
+        success: true,
+        data: cached.data,
+        modelUsed: cached.modelUsed || "cache-hit",
+        cached: true,
+      });
+    }
+
     const prompt = `Analyze this specific stressful, limiting, or anxious thought:
 "${thoughtText.trim()}"
 
@@ -564,6 +696,9 @@ Return ONLY the raw JSON without markdown formatting.`;
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       systemInstruction: "You are a world-class cognitive reframing coach. Output raw JSON only.",
       temperature: 0.3,
+      responseMimeType: "application/json",
+      maxOutputTokens: 500,
+      timeoutMs: 6000,
     });
 
     let reframeData: any = null;
@@ -583,6 +718,9 @@ Return ONLY the raw JSON without markdown formatting.`;
         realityTestingQuestion: "What is the most likely realistic outcome, and what concrete resource or skill do you have right now to navigate it?",
       };
     }
+
+    // Cache reframed thoughts for 30 minutes
+    setCachedResponse(cacheKey, reframeData, 30 * 60 * 1000, result.modelUsed);
 
     return res.json({
       success: true,
@@ -1455,6 +1593,18 @@ app.post("/api/analytics/longitudinal-audit", async (req, res) => {
       });
     }
 
+    // Cache lookup for longitudinal audit
+    const cacheKey = createHashKey("longitudinal-audit", { timeRange, entryCount: entries.length, latestId: entries[0]?.id });
+    const cached = getCachedResponse<any>(cacheKey);
+    if (cached) {
+      return res.json({
+        success: true,
+        audit: cached.data,
+        modelUsed: cached.modelUsed || "cache-hit",
+        cached: true,
+      });
+    }
+
     console.log(`[Cognitive Audit] Analyzing ${entries.length} entries for range: ${timeRange}`);
 
     // Ephemeral payload sanitization: Strip PII and compress into structured summaries
@@ -1517,12 +1667,17 @@ Respond with ONLY a clean, valid JSON object strictly matching this schema (no m
     ],
     "targetDistortion": "Target distortion name"
   }
-}`;
+}
+
+Return ONLY the raw JSON object.`;
 
     const result = await generateContentWithFallback({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       systemInstruction: "You are an analytical cognitive psychologist and behavioral trajectory auditor. Return strictly valid JSON with no markdown wrapping.",
       temperature: 0.3,
+      responseMimeType: "application/json",
+      maxOutputTokens: 1800,
+      timeoutMs: 12000,
     });
 
     let parsedJson: any = {};
@@ -1577,6 +1732,9 @@ Respond with ONLY a clean, valid JSON object strictly matching this schema (no m
       modelUsed: result.modelUsed,
     };
 
+    // Cache longitudinal audit for 5 minutes
+    setCachedResponse(cacheKey, normalizedResult, 5 * 60 * 1000, result.modelUsed);
+
     return res.json({
       success: true,
       audit: normalizedResult,
@@ -1601,6 +1759,18 @@ app.post("/api/analytics/constellation-graph", async (req, res) => {
     if (entries.length === 0) {
       return res.status(400).json({
         error: "At least 1 journal reflection is required to build the Subconscious Timeline.",
+      });
+    }
+
+    // Cache lookup for constellation graph
+    const cacheKey = createHashKey("constellation-graph", { timeframe, entryCount: entries.length, latestId: entries[0]?.id });
+    const cached = getCachedResponse<any>(cacheKey);
+    if (cached) {
+      return res.json({
+        success: true,
+        data: cached.data,
+        modelUsed: cached.modelUsed || "cache-hit",
+        cached: true,
       });
     }
 
@@ -1678,6 +1848,9 @@ Return ONLY a clean, valid JSON object strictly matching this schema with NO mar
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       systemInstruction: "You are an analytical cognitive psychologist and graph data extractor. Return strictly valid JSON with no markdown wrapping.",
       temperature: 0.3,
+      responseMimeType: "application/json",
+      maxOutputTokens: 2000,
+      timeoutMs: 12000,
     });
 
     let parsedJson: any = {};
@@ -1829,6 +2002,9 @@ Return ONLY a clean, valid JSON object strictly matching this schema with NO mar
       analyzedAt: new Date().toISOString(),
       modelUsed: result.modelUsed,
     };
+
+    // Cache constellation graph for 5 minutes
+    setCachedResponse(cacheKey, responsePayload, 5 * 60 * 1000, result.modelUsed);
 
     return res.json({
       success: true,

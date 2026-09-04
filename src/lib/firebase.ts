@@ -22,9 +22,20 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
-import { stripUndefined } from "./sanitizer";
+import { stripUndefined, safeJsonStringify } from "./sanitizer";
 import { normalizeToIsoString } from "./dateUtils";
-import type { JournalEntry, JournalMessage, JournalSummary, CognitiveAnalysisResult, ReflectionMode, UserProfile, UserRole, SystemAuditLog, EmailReminderSettings } from "../types";
+import type {
+  JournalEntry,
+  JournalMessage,
+  JournalSummary,
+  CognitiveAnalysisResult,
+  ReflectionMode,
+  UserProfile,
+  UserRole,
+  AppTheme,
+  SystemAuditLog,
+  EmailReminderSettings,
+} from "../types";
 
 // Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -109,6 +120,21 @@ export async function updateUserProfileDisplayName(
 }
 
 /**
+ * Update the user's preferred visual theme in Firestore
+ */
+export async function updateUserProfileTheme(
+  userId: string,
+  theme: AppTheme
+): Promise<void> {
+  if (!userId) return;
+  const userDocRef = doc(db, "users", userId);
+  await updateDoc(userDocRef, {
+    theme,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
  * Subscribe to current user's profile to monitor role in real-time
  */
 export function subscribeToUserProfile(
@@ -133,6 +159,7 @@ export function subscribeToUserProfile(
           email: data.email || null,
           photoURL: data.photoURL || null,
           role: (data.role as UserRole) || "user",
+          theme: (data.theme as AppTheme) || undefined,
           createdAt: normalizeToIsoString(data.createdAt),
           lastLogin: normalizeToIsoString(data.lastLogin),
         });
@@ -141,7 +168,7 @@ export function subscribeToUserProfile(
       }
     },
     (err) => {
-      console.warn("[Firestore] User profile snapshot error:", err);
+      console.warn("[Firestore] User profile snapshot error:", err?.message || String(err));
       if (onError) onError(err);
     }
   );
@@ -168,8 +195,8 @@ export async function fetchAllUsers(): Promise<UserProfile[]> {
       });
     });
     return users;
-  } catch (err) {
-    console.error("[Firestore] Error fetching users list:", err);
+  } catch (err: any) {
+    console.error("[Firestore] Error fetching users list:", err?.message || String(err));
     return [];
   }
 }
@@ -204,13 +231,21 @@ export async function updateUserRole(
  */
 export async function logAuditEvent(log: Omit<SystemAuditLog, "id" | "timestamp">): Promise<void> {
   try {
+    const payload = {
+      action: log.action,
+      actorUid: log.actorUid || "anonymous",
+      actorEmail: log.actorEmail || undefined,
+      targetResource: log.targetResource || undefined,
+      status: log.status || "success",
+      details: log.details || undefined,
+    };
     await fetch("/api/audit/log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(log),
+      body: safeJsonStringify(payload),
     });
-  } catch (err) {
-    console.warn("[Security Audit] Could not record audit log to server:", err);
+  } catch (err: any) {
+    console.warn("[Security Audit] Could not record audit log to server:", err?.message || String(err));
   }
 }
 
@@ -278,7 +313,7 @@ export function subscribeToUserEntries(
       onUpdate(entries);
     },
     (error) => {
-      console.error("[Firestore] Error subscribing to entries:", error);
+      console.error("[Firestore] Error subscribing to entries:", error?.message || String(error));
       if (onError) onError(error);
     }
   );
@@ -318,7 +353,7 @@ export function subscribeToEntryMessages(
       onUpdate(messages);
     },
     (error) => {
-      console.error("[Firestore] Error subscribing to messages:", error);
+      console.error("[Firestore] Error subscribing to messages:", error?.message || String(error));
       if (onError) onError(error);
     }
   );
@@ -403,19 +438,21 @@ export async function saveJournalMessage(
   const msgPayload = stripUndefined({
     role: message.role,
     content: message.content,
-    modelUsed: message.modelUsed || (message.role === "assistant" ? "gemini-3.7-flash" : undefined),
+    modelUsed: message.modelUsed || (message.role === "assistant" ? "gemini-3.1-flash-lite" : undefined),
     timestamp: now,
   });
 
-  await setDoc(messageDocRef, msgPayload);
-
-  // Update parent entry with snippet and count
   const entryDocRef = doc(db, "users", userId, "entries", entryId);
   const snippet = message.content.slice(0, 120);
-  await updateDoc(entryDocRef, {
-    snippet,
-    updatedAt: serverTimestamp(),
-  });
+
+  // Execute message creation and parent entry update concurrently for low latency
+  await Promise.all([
+    setDoc(messageDocRef, msgPayload),
+    updateDoc(entryDocRef, {
+      snippet,
+      updatedAt: serverTimestamp(),
+    }),
+  ]);
 
   return msgId;
 }
@@ -505,7 +542,7 @@ export function subscribeUserReminderSettings(
       onUpdate(null);
     },
     (err) => {
-      console.warn("[Firestore] Reminder settings snapshot error:", err);
+      console.warn("[Firestore] Reminder settings snapshot error:", err?.message || String(err));
       onUpdate(null);
     }
   );

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import type { User } from "firebase/auth";
-import type { UserProfile, UserRole } from "../types";
+import type { UserProfile, UserRole, AppTheme } from "../types";
 import { updateUserProfileDisplayName } from "../lib/firebase";
+import { AVAILABLE_THEMES } from "../lib/theme";
 import {
   User as UserIcon,
   X,
@@ -15,6 +16,7 @@ import {
   Sparkles,
   BookOpen,
   Loader2,
+  Palette,
 } from "lucide-react";
 
 interface UserProfileModalProps {
@@ -24,6 +26,8 @@ interface UserProfileModalProps {
   userProfile: UserProfile | null;
   userRole: UserRole;
   totalEntriesCount: number;
+  currentTheme?: AppTheme;
+  onThemeSelect?: (theme: AppTheme) => void;
 }
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({
@@ -33,6 +37,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   userProfile,
   userRole,
   totalEntriesCount,
+  currentTheme = "light",
+  onThemeSelect,
 }) => {
   const currentDisplayName =
     userProfile?.displayName ||
@@ -235,6 +241,61 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
             )}
           </div>
+
+          {/* Visual Appearance & Theme Palette */}
+          {onThemeSelect && (
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Palette className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Visual Canvas Theme</span>
+                </label>
+                <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                  Live Preview
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {AVAILABLE_THEMES.map((theme) => {
+                  const isSelected = theme.id === currentTheme;
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      onClick={() => onThemeSelect(theme.id)}
+                      className={`text-left p-2.5 rounded-xl border transition-all cursor-pointer flex items-center gap-2.5 ${
+                        isSelected
+                          ? "border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-950/40 shadow-xs"
+                          : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900/40"
+                      }`}
+                    >
+                      <div
+                        className="w-8 h-8 rounded-lg border border-slate-300/80 dark:border-slate-700 shadow-2xs flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: theme.previewBg }}
+                      >
+                        <span
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: theme.previewAccent }}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                            {theme.name}
+                          </span>
+                          {isSelected && (
+                            <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                          )}
+                        </div>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate">
+                          {theme.category}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Account Metadata Stats Grid */}
           <div className="grid grid-cols-2 gap-3 pt-2">

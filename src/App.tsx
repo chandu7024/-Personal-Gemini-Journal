@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth, signInWithGoogle, signOutUser } from "./lib/firebase";
+import { applyAppTheme, getSavedAppTheme } from "./lib/theme";
 import { AuthLanding } from "./components/AuthLanding";
 import { Dashboard } from "./components/Dashboard";
 import { ThreatModelModal } from "./components/ThreatModelModal";
@@ -15,6 +16,11 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isThreatModalOpen, setIsThreatModalOpen] = useState(false);
+
+  // Initialize theme on initial app hydration
+  useEffect(() => {
+    applyAppTheme(getSavedAppTheme());
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {

@@ -30,6 +30,7 @@ interface EntryWorkspaceProps {
   messages: JournalMessage[];
   isLoading: boolean;
   onSendMessage: (content: string) => Promise<void>;
+  onCancelMessage?: () => void;
   onUpdateTitle: (newTitle: string) => void;
   onChangeMode: (mode: ReflectionMode) => void;
   onAddTag: (tag: string) => void;
@@ -81,6 +82,7 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
   messages,
   isLoading,
   onSendMessage,
+  onCancelMessage,
   onUpdateTitle,
   onChangeMode,
   onAddTag,
@@ -173,7 +175,7 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
   const quickPrompts = QUICK_PROMPTS[entry.mode] || QUICK_PROMPTS.mindful;
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-4rem)] bg-slate-100/50 dark:bg-[#0b0f17]/90 relative overflow-hidden">
+    <div className="flex-1 flex flex-col h-full min-w-0 bg-slate-100/50 dark:bg-[#0b0f17]/90 relative overflow-hidden">
       {/* Workspace Top Bar */}
       <div className="p-4 sm:px-6 border-b border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-md flex flex-col gap-3 shadow-2xs">
         {/* Title and Controls */}
@@ -562,7 +564,20 @@ export const EntryWorkspace: React.FC<EntryWorkspaceProps> = ({
             </span>
 
             <div className="flex items-center gap-2">
-              {onOpenVoiceJournal && (
+              {isLoading && onCancelMessage && (
+                <button
+                  id="btn-cancel-message"
+                  type="button"
+                  onClick={onCancelMessage}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
+                  title="Cancel reflection generation"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Cancel</span>
+                </button>
+              )}
+
+              {onOpenVoiceJournal && !isLoading && (
                 <button
                   id="btn-input-voice-socratic"
                   type="button"

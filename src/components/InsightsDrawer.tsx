@@ -163,7 +163,7 @@ ${summary.suggestedTopics.map((t) => `- ${t}`).join("\n")}
   return (
     <aside
       id="insights-drawer"
-      className="w-full sm:w-88 md:w-[420px] border-l border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md flex flex-col h-[calc(100vh-4rem)] shrink-0 z-20 overflow-hidden shadow-2xs"
+      className="w-full sm:w-80 md:w-96 lg:w-[400px] border-l border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md flex flex-col h-full shrink-0 z-20 overflow-hidden shadow-2xs"
     >
       {/* Top Header */}
       <div className="p-3.5 border-b border-slate-200/70 dark:border-slate-800 flex items-center justify-between">

@@ -17,6 +17,7 @@ import {
   Play,
   Square,
   Radio,
+  Languages,
 } from "lucide-react";
 import type { JournalEntry, JournalMessage, UserRole } from "../types";
 import { sendVoiceSocraticTurn } from "../lib/geminiApi";
@@ -31,6 +32,54 @@ interface SocraticVoiceModalProps {
 
 type AudioState = "idle" | "listening" | "thinking" | "speaking" | "error";
 
+/**
+ * Filter strictly for English voices and rank natural/high-clarity voices first.
+ * Completely excludes foreign language voices to prevent non-English speech synthesis.
+ */
+function filterAndSortEnglishVoices(allVoices: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
+  if (!allVoices || allVoices.length === 0) return [];
+
+  const englishVoices = allVoices.filter((voice) => {
+    const lang = (voice.lang || "").toLowerCase().replace("_", "-");
+    const name = (voice.name || "").toLowerCase();
+
+    // Must have BCP-47 English tag (en, en-US, en-GB, en-AU, en-CA, en-IN, en-IE, etc.)
+    if (lang === "en" || lang.startsWith("en-")) {
+      return true;
+    }
+
+    // Or explicit English naming if language tag was unpopulated
+    if (name.includes("english") || name.includes("en-us") || name.includes("en-gb")) {
+      return true;
+    }
+
+    return false;
+  });
+
+  return englishVoices.sort((a, b) => {
+    const aName = a.name.toLowerCase();
+    const bName = b.name.toLowerCase();
+    const aLang = a.lang.toLowerCase();
+    const bLang = b.lang.toLowerCase();
+
+    const getScore = (name: string, lang: string) => {
+      let score = 0;
+      // Prioritize natural sounding English voices
+      if (name.includes("google") && (lang.includes("en-us") || name.includes("us english"))) score += 30;
+      if (name.includes("google") && (lang.includes("en-gb") || name.includes("uk english"))) score += 25;
+      if (name.includes("natural") || name.includes("neural") || name.includes("premium")) score += 20;
+      if (name.includes("samantha") || name.includes("karen") || name.includes("daniel") || name.includes("alex")) score += 18;
+      if (lang.startsWith("en-us")) score += 15;
+      if (lang.startsWith("en-gb")) score += 12;
+      if (lang.startsWith("en-au") || lang.startsWith("en-ca") || lang.startsWith("en-in")) score += 10;
+      if (lang.startsWith("en")) score += 5;
+      return score;
+    };
+
+    return getScore(bName, bLang) - getScore(aName, aLang);
+  });
+}
+
 export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
   isOpen,
   onClose,
@@ -40,6 +89,8 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
 }) => {
   const [audioState, setAudioState] = useState<AudioState>("idle");
   const [isMuted, setIsMuted] = useState(false);
+  const [availableEnglishVoices, setAvailableEnglishVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceUri, setSelectedVoiceUri] = useState<string>("");
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ role: "user" | "assistant"; text: string; time: string }>>([]);
   const [currentInterimText, setCurrentInterimText] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -62,6 +113,7 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
   const audioStateRef = useRef<AudioState>("idle");
   audioStateRef.current = audioState;
   const isRecognitionActiveRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Initialize Web Speech Recognition
   useEffect(() => {
@@ -143,9 +195,36 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
     };
   }, [isOpen]);
 
+  // Load and refresh strictly English SpeechSynthesis voices on mount or when system voices update
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    const refreshEnglishVoices = () => {
+      const allVoices = window.speechSynthesis.getVoices() || [];
+      const enVoices = filterAndSortEnglishVoices(allVoices);
+      setAvailableEnglishVoices(enVoices);
+      if (enVoices.length > 0) {
+        setSelectedVoiceUri((prev) => {
+          if (prev && enVoices.some((v) => v.voiceURI === prev)) return prev;
+          return enVoices[0].voiceURI;
+        });
+      }
+    };
+
+    refreshEnglishVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", refreshEnglishVoices);
+    return () => {
+      window.speechSynthesis.removeEventListener("voiceschanged", refreshEnglishVoices);
+    };
+  }, [isOpen]);
+
   // Clean up on modal close or pause
   const stopAllAudio = () => {
     isRecognitionActiveRef.current = false;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     if (recognitionRef.current) {
       try {
         recognitionRef.current.abort();
@@ -314,6 +393,13 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
     setTranscriptHistory((prev) => [...prev, userTurn]);
     setAudioState("thinking");
 
+    // Abort previous in-flight AI voice query if any
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       // Build conversation payload for Gemini Audio Engine
       const historyPayload = transcriptHistory.map((t) => ({
@@ -326,6 +412,7 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
         history: historyPayload,
         tone: "socratic",
         mood: activeEntry?.mood,
+        signal: controller.signal,
       });
 
       if (response.success && response.text) {
@@ -351,10 +438,18 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
         throw new Error(response.error || "Could not generate Socratic response.");
       }
     } catch (err: any) {
+      if (err?.name === "AbortError" || String(err?.message || "").includes("aborted")) {
+        console.log("[Voice Journal] In-flight voice query cancelled cleanly.");
+        return;
+      }
       console.error("[Voice Journal] Processing failed:", err);
       setErrorMessage(err?.message || "Failed to process reflection turn.");
       isRecognitionActiveRef.current = false;
       setAudioState("idle");
+    } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -398,14 +493,24 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.95; // Contemplative, measured pace
       utterance.pitch = 1.0;
+      // CRITICAL: Explicitly lock utterance language to English
+      utterance.lang = "en-US";
 
-      // Select natural voice if available
-      const voices = window.speechSynthesis.getVoices();
-      const englishVoice =
-        voices.find((v) => v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Samantha")) ||
-        voices.find((v) => v.lang.startsWith("en"));
-      if (englishVoice) {
-        utterance.voice = englishVoice;
+      // Select strictly English voice from available synthesis voices
+      const currentVoices = window.speechSynthesis.getVoices() || [];
+      const enVoices = filterAndSortEnglishVoices(currentVoices);
+      let activeVoice: SpeechSynthesisVoice | null = null;
+
+      if (selectedVoiceUri) {
+        activeVoice = enVoices.find((v) => v.voiceURI === selectedVoiceUri) || null;
+      }
+      if (!activeVoice && enVoices.length > 0) {
+        activeVoice = enVoices[0];
+      }
+
+      if (activeVoice) {
+        utterance.voice = activeVoice;
+        utterance.lang = activeVoice.lang || "en-US";
       }
 
       utterance.onstart = () => {
@@ -515,6 +620,37 @@ export const SocraticVoiceModal: React.FC<SocraticVoiceModalProps> = ({
                 Continuous
               </button>
             </div>
+
+            {/* English Voice Actor Selector */}
+            {availableEnglishVoices.length > 0 && (
+              <div
+                className="hidden sm:flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded-lg text-xs"
+                title="Spoken voice is strictly locked to English. Select your preferred English accent or voice."
+              >
+                <Languages className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                <select
+                  id="select-english-voice"
+                  value={selectedVoiceUri}
+                  onChange={(e) => setSelectedVoiceUri(e.target.value)}
+                  className="bg-transparent text-slate-700 dark:text-slate-300 font-medium text-[11px] focus:outline-hidden max-w-[130px] truncate cursor-pointer"
+                  title="Select English Voice"
+                >
+                  {availableEnglishVoices.map((v) => {
+                    const cleanName =
+                      v.name.replace(/(Google|Microsoft|Apple|Natural|Neural)\s*/gi, "").trim() || v.name;
+                    return (
+                      <option
+                        key={v.voiceURI}
+                        value={v.voiceURI}
+                        className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
+                      >
+                        {cleanName} ({v.lang})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
 
             <button
               id="btn-toggle-voice-mute"

@@ -90,12 +90,26 @@ export interface ThreatModelItem {
 
 export type UserRole = "admin" | "user" | "super_admin";
 
+export type AppTheme = "light" | "dark" | "warm-linen" | "nordic-sage" | "executive-ice";
+
+export interface ThemeMetadata {
+  id: AppTheme;
+  name: string;
+  category: "Standard Light" | "Standard Dark" | "Professional Light";
+  description: string;
+  previewBg: string;
+  previewCard: string;
+  previewAccent: string;
+  previewText: string;
+}
+
 export interface UserProfile {
   uid: string;
   displayName: string | null;
   email: string | null;
   photoURL: string | null;
   role: UserRole;
+  theme?: AppTheme;
   createdAt: string;
   lastLogin: string;
   totalReflections?: number;

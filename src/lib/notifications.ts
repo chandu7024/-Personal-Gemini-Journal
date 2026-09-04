@@ -1,5 +1,5 @@
 import type { EmailNotificationPayload, NotificationDispatchResult, ReminderDispatchPayload, ReminderThemeMetadata } from "../types";
-import { sanitizeInput } from "./sanitizer";
+import { sanitizeInput, safeJsonStringify } from "./sanitizer";
 
 /**
  * Dispatch an executive reflection summary via Email API
@@ -24,7 +24,7 @@ export async function sendEmailNotification(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(sanitizedPayload),
+    body: safeJsonStringify(sanitizedPayload),
   });
 
   if (!response.ok) {
@@ -59,7 +59,7 @@ export async function dispatchReminderNotification(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(sanitizedPayload),
+    body: safeJsonStringify(sanitizedPayload),
   });
 
   if (!response.ok) {
@@ -142,7 +142,7 @@ export async function testExternalNotification(params: {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(params),
+    body: safeJsonStringify(params),
   });
 
   if (!response.ok) {

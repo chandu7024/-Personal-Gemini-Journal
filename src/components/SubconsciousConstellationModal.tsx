@@ -29,6 +29,7 @@ import {
   TimeWindow
 } from "../types";
 import { safeGetTime } from "../lib/dateUtils";
+import { safeJsonStringify } from "../lib/sanitizer";
 
 interface SubconsciousConstellationModalProps {
   isOpen: boolean;
@@ -79,7 +80,7 @@ export const SubconsciousConstellationModal: React.FC<SubconsciousConstellationM
       const response = await fetch("/api/analytics/constellation-graph", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: safeJsonStringify({
           entries: targetList.map((e) => ({
             id: e.id,
             title: e.title,

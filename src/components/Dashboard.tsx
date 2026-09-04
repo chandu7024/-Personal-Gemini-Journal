@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { User } from "firebase/auth";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
@@ -22,9 +22,20 @@ import {
   saveJournalMessage,
   saveEntrySummary,
   saveEntryCognitiveAnalysis,
+  updateUserProfileTheme,
 } from "../lib/firebase";
+import { applyAppTheme, getSavedAppTheme } from "../lib/theme";
 import { sendChatMessage, summarizeJournalEntry, analyzeCognitiveBiases } from "../lib/geminiApi";
-import type { JournalEntry, JournalMessage, ReflectionMode, EntryLocation, UserRole, EmailReminderSettings, UserProfile } from "../types";
+import type {
+  JournalEntry,
+  JournalMessage,
+  ReflectionMode,
+  EntryLocation,
+  UserRole,
+  EmailReminderSettings,
+  UserProfile,
+  AppTheme,
+} from "../types";
 import { Loader2, Plus, Sparkles, BookOpen, Mic } from "lucide-react";
 
 interface DashboardProps {
@@ -33,6 +44,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
+  const [currentTheme, setCurrentTheme] = useState<AppTheme>(getSavedAppTheme);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const [messages, setMessages] = useState<JournalMessage[]>([]);
@@ -55,6 +67,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
+  // In-flight AI request controllers for instant cancellation
+  const inFlightChatAbortRef = useRef<AbortController | null>(null);
+  const inFlightSynthesizeAbortRef = useRef<AbortController | null>(null);
+  const inFlightAnalyzeAbortRef = useRef<AbortController | null>(null);
+
+  // Clean up in-flight requests on active entry switch or unmount
+  useEffect(() => {
+    return () => {
+      inFlightChatAbortRef.current?.abort();
+      inFlightSynthesizeAbortRef.current?.abort();
+      inFlightAnalyzeAbortRef.current?.abort();
+    };
+  }, [activeEntryId]);
+
   // Subscribe to user profile to monitor role & display name in real-time
   useEffect(() => {
     if (!user.uid) return;
@@ -63,6 +89,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         setUserProfile(profile);
         if (profile.role) {
           setUserRole(profile.role);
+        }
+        if (profile.theme && profile.theme !== currentTheme) {
+          setCurrentTheme(profile.theme);
+          applyAppTheme(profile.theme);
         }
       }
     });
@@ -75,6 +105,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
       unsubscribeReminders();
     };
   }, [user.uid]);
+
+  // Apply theme immediately to DOM and persist
+  useEffect(() => {
+    applyAppTheme(currentTheme);
+  }, [currentTheme]);
+
+  const handleThemeSelect = (theme: AppTheme) => {
+    setCurrentTheme(theme);
+    applyAppTheme(theme);
+    if (user?.uid) {
+      updateUserProfileTheme(user.uid, theme).catch((err) => {
+        console.warn("Could not save theme preference to user profile:", err);
+      });
+    }
+  };
 
 
   // 1. Subscribe to User's Journal Entries (Isolated by user.uid in Firestore)
@@ -128,7 +173,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         }
       },
       (error) => {
-        console.error("Firestore user entries error:", error);
+        console.error("Firestore user entries error:", error?.message || String(error));
         setIsEntriesLoading(false);
       }
     );
@@ -150,7 +195,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         setMessages(entryMessages);
       },
       (error) => {
-        console.error("Firestore messages error:", error);
+        console.error("Firestore messages error:", error?.message || String(error));
       }
     );
 
@@ -250,12 +295,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     }
   };
 
+  // Handler: Cancel in-flight message reflection
+  const handleCancelMessage = () => {
+    if (inFlightChatAbortRef.current) {
+      inFlightChatAbortRef.current.abort();
+      inFlightChatAbortRef.current = null;
+    }
+    setIsAiGenerating(false);
+  };
+
   // Handler: Send Message & Get Gemini Reflection
   const handleSendMessage = async (userContent: string) => {
     if (!activeEntryId || !activeEntry) return;
 
-    // 1. Save User Message to Firestore
-    await saveJournalMessage(user.uid, activeEntryId, {
+    // Abort previous in-flight chat call if still active
+    if (inFlightChatAbortRef.current) {
+      inFlightChatAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    inFlightChatAbortRef.current = controller;
+
+    setIsAiGenerating(true);
+
+    // 1. Initiate Firestore save concurrently with AI generation
+    const saveUserMsgPromise = saveJournalMessage(user.uid, activeEntryId, {
       role: "user",
       content: userContent,
     });
@@ -266,23 +329,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
       { role: "user", content: userContent },
     ];
 
-    setIsAiGenerating(true);
-
     try {
-      // 3. Call backend Gemini Chat API with fallback ladder & location context
-      const response = await sendChatMessage({
-        messages: conversationPayload,
-        mode: activeEntry.mode,
-        location: activeEntry.location ? {
-          lat: activeEntry.location.lat,
-          lng: activeEntry.location.lng,
-          placeName: activeEntry.location.placeName,
-        } : null,
-      });
+      // 3. Call backend Gemini Chat API concurrently with Firestore saving
+      const [response] = await Promise.all([
+        sendChatMessage({
+          messages: conversationPayload,
+          mode: activeEntry.mode,
+          location: activeEntry.location ? {
+            lat: activeEntry.location.lat,
+            lng: activeEntry.location.lng,
+            placeName: activeEntry.location.placeName,
+          } : null,
+          signal: controller.signal,
+        }),
+        saveUserMsgPromise,
+      ]);
 
       if (response.success && response.text) {
         // 4. Save Gemini Reflection to Firestore
-        await saveJournalMessage(user.uid, activeEntryId, {
+        const saveAssistantPromise = saveJournalMessage(user.uid, activeEntryId, {
           role: "assistant",
           content: response.text,
           modelUsed: response.modelUsed,
@@ -291,13 +356,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         // 5. If this was the first user message and title is default, generate a smart title
         if (messages.length === 0 && activeEntry.title === "New Reflection") {
           const autoTitle = userContent.slice(0, 30).trim() + "...";
-          await updateJournalEntry(user.uid, activeEntryId, { title: autoTitle });
+          await Promise.all([
+            saveAssistantPromise,
+            updateJournalEntry(user.uid, activeEntryId, { title: autoTitle }),
+          ]);
+        } else {
+          await saveAssistantPromise;
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === "AbortError" || String(error?.message || "").includes("aborted")) {
+        console.log("[Chat] Reflection request cancelled cleanly.");
+        return;
+      }
       console.error("Error communicating with Gemini:", error);
       throw error;
     } finally {
+      if (inFlightChatAbortRef.current === controller) {
+        inFlightChatAbortRef.current = null;
+      }
       setIsAiGenerating(false);
     }
   };
@@ -306,6 +383,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const handleSynthesize = async () => {
     if (!activeEntryId || !activeEntry || messages.length === 0) return;
 
+    if (inFlightSynthesizeAbortRef.current) {
+      inFlightSynthesizeAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    inFlightSynthesizeAbortRef.current = controller;
+
     setIsSynthesizing(true);
     setIsInsightsOpen(true);
 
@@ -313,14 +396,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
       const response = await summarizeJournalEntry({
         messages,
         title: activeEntry.title,
+        signal: controller.signal,
       });
 
       if (response.success && response.summary) {
         await saveEntrySummary(user.uid, activeEntryId, response.summary);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === "AbortError" || String(error?.message || "").includes("aborted")) {
+        console.log("[Synthesis] Synthesis request cancelled cleanly.");
+        return;
+      }
       console.error("Failed to synthesize journal entry:", error);
     } finally {
+      if (inFlightSynthesizeAbortRef.current === controller) {
+        inFlightSynthesizeAbortRef.current = null;
+      }
       setIsSynthesizing(false);
     }
   };
@@ -329,6 +420,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const handleAnalyzeCognitiveBiases = async () => {
     if (!activeEntryId || !activeEntry || messages.length === 0) return;
 
+    if (inFlightAnalyzeAbortRef.current) {
+      inFlightAnalyzeAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    inFlightAnalyzeAbortRef.current = controller;
+
     setIsAnalyzingCognition(true);
     setIsInsightsOpen(true);
 
@@ -336,14 +433,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
       const response = await analyzeCognitiveBiases({
         messages,
         title: activeEntry.title,
+        signal: controller.signal,
       });
 
       if (response.success && response.analysis) {
         await saveEntryCognitiveAnalysis(user.uid, activeEntryId, response.analysis);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === "AbortError" || String(error?.message || "").includes("aborted")) {
+        console.log("[Cognitive Analysis] Request cancelled cleanly.");
+        return;
+      }
       console.error("Failed to analyze cognitive distortions:", error);
     } finally {
+      if (inFlightAnalyzeAbortRef.current === controller) {
+        inFlightAnalyzeAbortRef.current = null;
+      }
       setIsAnalyzingCognition(false);
     }
   };
@@ -421,12 +526,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     (user?.email ? user.email.split("@")[0] : "ReflectAI User");
 
   return (
-    <div className="min-h-screen bg-slate-100/75 dark:bg-[#0b0f17] flex flex-col antialiased">
+    <div className="h-screen max-h-screen w-full overflow-hidden flex flex-col bg-slate-100/75 dark:bg-[#0b0f17] antialiased">
       {/* Top Navigation */}
       <Navbar
         user={user}
         userProfile={userProfile}
         userRole={userRole}
+        currentTheme={currentTheme}
+        onThemeSelect={handleThemeSelect}
         reminderSettings={reminderSettings}
         onSignOut={onSignOut}
         onNewEntry={handleNewEntry}
@@ -442,7 +549,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
       />
 
       {/* Main Content Workspace */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0 min-w-0 w-full relative">
         {/* Left Sidebar: Entries History */}
         <Sidebar
           entries={entries}
@@ -470,7 +577,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
             </div>
           </div>
         ) : entries.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-950 text-center">
+          <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-950 text-center overflow-y-auto">
             <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-4 shadow-xs">
               <BookOpen className="w-7 h-7" />
             </div>
@@ -506,6 +613,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
             messages={messages}
             isLoading={isAiGenerating}
             onSendMessage={handleSendMessage}
+            onCancelMessage={handleCancelMessage}
             onUpdateTitle={handleUpdateTitle}
             onChangeMode={handleChangeMode}
             onAddTag={handleAddTag}
@@ -607,6 +715,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         userProfile={userProfile}
         userRole={userRole}
         totalEntriesCount={entries.length}
+        currentTheme={currentTheme}
+        onThemeSelect={handleThemeSelect}
       />
     </div>
   );

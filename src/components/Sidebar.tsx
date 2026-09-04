@@ -90,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       id="sidebar-journal-history"
-      className="w-full sm:w-80 md:w-88 border-r border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-[#0f172a]/90 flex flex-col h-[calc(100vh-4rem)] shrink-0 z-20 transition-all backdrop-blur-xs"
+      className="w-full sm:w-72 md:w-80 border-r border-slate-200/80 dark:border-slate-800 bg-slate-50/95 dark:bg-[#0f172a]/95 flex flex-col h-full shrink-0 z-20 transition-all backdrop-blur-xs overflow-hidden"
     >
       {/* Sidebar Header & New Button */}
       <div className="p-4 border-b border-slate-200/70 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 space-y-3">

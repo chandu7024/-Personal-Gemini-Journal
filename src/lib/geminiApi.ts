@@ -7,7 +7,7 @@ import type {
   JournalEntry,
   LongitudinalAuditResult,
 } from "../types";
-import { sanitizeInput } from "./sanitizer";
+import { sanitizeInput, safeJsonStringify } from "./sanitizer";
 
 export interface ChatResponse {
   success: boolean;
@@ -46,9 +46,9 @@ export interface VoiceSocraticTurnResponse {
 }
 
 /**
- * Robust fetch wrapper that guarantees safe JSON handling and protects against HTML responses
+ * Robust fetch wrapper that guarantees safe JSON handling, protects against HTML responses, and supports cancellation
  */
-async function safeApiPost<T>(url: string, payload: any, defaultErrorMessage: string): Promise<T> {
+async function safeApiPost<T>(url: string, payload: any, defaultErrorMessage: string, signal?: AbortSignal): Promise<T> {
   let response: Response;
   try {
     response = await fetch(url, {
@@ -57,9 +57,13 @@ async function safeApiPost<T>(url: string, payload: any, defaultErrorMessage: st
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: safeJsonStringify(payload),
+      signal,
     });
   } catch (netErr: any) {
+    if (netErr?.name === "AbortError" || String(netErr?.message || "").includes("aborted")) {
+      throw netErr;
+    }
     throw new Error(`Network connection error: ${netErr?.message || "Failed to reach server"}`);
   }
 
@@ -96,6 +100,7 @@ export async function sendChatMessage(params: {
   mode: ReflectionMode;
   systemInstruction?: string;
   location?: { lat: number; lng: number; placeName: string } | null;
+  signal?: AbortSignal;
 }): Promise<ChatResponse> {
   const sanitizedMessages = params.messages.map((m) => ({
     role: m.role,
@@ -110,7 +115,8 @@ export async function sendChatMessage(params: {
       systemInstruction: params.systemInstruction,
       location: params.location,
     },
-    "Failed to generate reflection response"
+    "Failed to generate reflection response",
+    params.signal
   );
 }
 
@@ -122,6 +128,7 @@ export async function sendVoiceSocraticTurn(params: {
   history?: Array<{ role: string; content: string }>;
   tone?: string;
   mood?: string;
+  signal?: AbortSignal;
 }): Promise<VoiceSocraticTurnResponse> {
   const sanitizedTranscript = sanitizeInput(params.transcript);
   const sanitizedHistory = (params.history || []).map((h) => ({
@@ -137,7 +144,8 @@ export async function sendVoiceSocraticTurn(params: {
       tone: params.tone || "socratic",
       mood: params.mood,
     },
-    "Failed to process voice reflection turn"
+    "Failed to process voice reflection turn",
+    params.signal
   );
 }
 
@@ -147,6 +155,7 @@ export async function sendVoiceSocraticTurn(params: {
 export async function summarizeJournalEntry(params: {
   messages: JournalMessage[];
   title?: string;
+  signal?: AbortSignal;
 }): Promise<SummarizeResponse> {
   const sanitizedMessages = params.messages.map((m) => ({
     role: m.role,
@@ -159,7 +168,8 @@ export async function summarizeJournalEntry(params: {
       messages: sanitizedMessages,
       title: params.title,
     },
-    "Failed to generate journal summary"
+    "Failed to generate journal summary",
+    params.signal
   );
 }
 
@@ -170,6 +180,7 @@ export async function analyzeCognitiveBiases(params: {
   messages?: JournalMessage[];
   text?: string;
   title?: string;
+  signal?: AbortSignal;
 }): Promise<CognitiveAnalysisResponse> {
   const sanitizedMessages = params.messages?.map((m) => ({
     role: m.role,
@@ -183,14 +194,15 @@ export async function analyzeCognitiveBiases(params: {
       text: params.text ? sanitizeInput(params.text) : undefined,
       title: params.title ? sanitizeInput(params.title) : undefined,
     },
-    "Failed to diagnose cognitive patterns"
+    "Failed to diagnose cognitive patterns",
+    params.signal
   );
 }
 
 /**
  * Request instant Cognitive Behavioral reframe for a single thought
  */
-export async function reframeSingleThought(thoughtText: string): Promise<InstantReframeResponse> {
+export async function reframeSingleThought(thoughtText: string, signal?: AbortSignal): Promise<InstantReframeResponse> {
   const sanitizedText = sanitizeInput(thoughtText);
 
   return safeApiPost<InstantReframeResponse>(
@@ -198,7 +210,8 @@ export async function reframeSingleThought(thoughtText: string): Promise<Instant
     {
       thoughtText: sanitizedText,
     },
-    "Failed to generate cognitive reframe"
+    "Failed to generate cognitive reframe",
+    signal
   );
 }
 
@@ -208,6 +221,7 @@ export async function reframeSingleThought(thoughtText: string): Promise<Instant
 export async function requestLongitudinalAudit(params: {
   timeRange: string;
   entries: JournalEntry[];
+  signal?: AbortSignal;
 }): Promise<{ success: boolean; audit: LongitudinalAuditResult }> {
   // Sanitize payloads to strip private identifiers
   const sanitizedEntries = params.entries.map((e) => ({
@@ -246,7 +260,8 @@ export async function requestLongitudinalAudit(params: {
       timeRange: params.timeRange,
       entries: sanitizedEntries,
     },
-    "Failed to perform longitudinal audit"
+    "Failed to perform longitudinal audit",
+    params.signal
   );
 }
 
